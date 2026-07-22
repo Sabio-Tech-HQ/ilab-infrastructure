@@ -8,21 +8,20 @@
         name: [haproxy, keepalived, socat, curl, psmisc]
         state: present
         update_cache: yes
+        cache_valid_time: 3600
+      register: apt_action
+      retries: 3
+      delay: 5
+      until: apt_action is success
 
-    - name: 2. Install Tailscale Binary
-      shell: |
-        curl -fsSL https://tailscale.com/install.sh | sh
-      args:
-        creates: /usr/bin/tailscale
-
-    - name: 3. Allow Non-Local IP Binding
+    - name: 2. Allow Non-Local IP Binding
       sysctl:
         name: net.ipv4.ip_nonlocal_bind
         value: '1'
         state: present
         reload: yes
 
-    - name: 4. Deploy HAProxy Config
+    - name: 3. Deploy HAProxy Config
       copy:
         dest: /etc/haproxy/haproxy.cfg
         content: |+
@@ -43,8 +42,7 @@
           listen postgres_cluster
               bind *:5432
               mode tcp
-              option httpchk
-              http-check send meth GET uri /leader
+              option httpchk OPTIONS /primary
               http-check expect status 200
               {% for host in groups['databases'] %}
               server {{ host }} {{ hostvars[host]['ansible_host'] }}:5432 check port 8008 inter 2s fall 3 rise 2
@@ -56,26 +54,21 @@
               stats enable
               stats uri /stats
 
-    - name: 5. Deploy Keepalived Config
+    - name: 4. Deploy Keepalived Config
       template:
         src: templates/keepalived.conf.j2
         dest: /etc/keepalived/keepalived.conf
 
-    - name: 6. Start HAProxy Service
+    - name: 5. Start HAProxy Service
       service:
         name: haproxy
         state: restarted
         enabled: yes
 
-    - name: 7. Start Keepalived Service
+    - name: 6. Start Keepalived Service
       service:
         name: keepalived
         state: restarted
         enabled: yes
 
-    - name: 8. Initialize Tailscale Identity
-      shell: |
-        tailscale logout || true
-        rm -rf /var/lib/tailscale/tailscaled.state
-        systemctl restart tailscaled
-        tailscale up --authkey=tskey-auth-kicUVgwXeq11CNTRL-UUcb6kRiE5GoZYgyhfHX4G7dVagraPKJ --hostname={{ inventory_hostname }} --advertise-routes=10.10.10.200/32 --reset
+    

@@ -1,0 +1,48 @@
+---
+- name: SQL 2022 Installation (Virtual Account Method)
+  hosts: sql_nodes
+  become: yes
+  become_method: runas
+  become_user: "{{ ansible_user }}"
+  vars:
+    sql_iso_path: "C:\\Users\\Administrator\\Downloads\\SQLServer2022-x64-ENU.iso"
+    sql_svc_account: "ILAB\\sql_svc"
+
+  tasks:
+    - name: Mount SQL ISO
+      win_disk_image:
+        image_path: "{{ sql_iso_path }}"
+        state: present
+      register: disk_out
+
+    - name: Run SQL Install (Using Virtual Account)
+      win_package:
+        path: "{{ disk_out.mount_paths[0] }}setup.exe"
+        arguments:
+          - /ACTION=Install
+          - /FEATURES=SQLENGINE,CONN
+          - /INSTANCENAME=MSSQLSERVER
+          - /SQLSVCACCOUNT="NT SERVICE\MSSQLSERVER"  # Virtual Account: No password needed
+          - /SQLSYSADMINACCOUNTS="ILAB\Administrator"
+          - /UpdateEnabled=False
+          - /IACCEPTSQLSERVERLICENSETERMS
+          - /QUIET
+        state: present
+
+    - name: Set Service Account and Password (Post-Install)
+      win_service:
+        name: MSSQLSERVER
+        user: "{{ sql_svc_account }}"
+        password: "{{ ansible_password }}"
+        state: restarted
+
+    - name: Enable Always On Feature
+      win_shell: |
+        Import-Module SQLPS -DisableNameChecking
+        Enable-SqlAlwaysOn -ServerInstance "localhost" -Force
+      failed_when: false
+
+    - name: Unmount SQL ISO
+      win_disk_image:
+        image_path: "{{ sql_iso_path }}"
+        state: absent

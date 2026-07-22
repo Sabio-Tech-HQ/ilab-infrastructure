@@ -1,0 +1,87 @@
+- name: Provision Memos Environment
+  hosts: memos_servers
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    # 1. Create the user and set up SSH access so you can stop using root
+    - name: Ensure jthairu user exists
+      user:
+        name: jthairu
+        shell: /bin/bash
+        groups: sudo
+        append: yes
+        state: present
+
+    - name: Add SSH key for jthairu
+      authorized_key:
+        user: jthairu
+        key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+
+    # 2. Standard system prep
+    - name: Update apt cache and upgrade packages
+      apt:
+        upgrade: dist
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - curl
+          - ca-certificates
+        state: present
+
+    # 3. Docker installation
+    - name: Download Docker installation script
+      get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+
+    - name: Run Docker installation script
+      command: sh /tmp/get-docker.sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Ensure Docker service is running and enabled
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add jthairu to docker group
+      user:
+        name: jthairu
+        groups: docker
+        append: yes
+
+    # 4. Memos Setup
+    - name: Create Memos persistent data directory
+      file:
+        path: /opt/memos
+        state: directory
+        owner: jthairu
+        group: jthairu
+        mode: '0755'
+
+    - name: Create docker-compose.yml for Memos
+      copy:
+        dest: /opt/memos/docker-compose.yml
+        content: |
+          services:
+            memos:
+              image: neosmemo/memos:stable
+              container_name: memos
+              ports:
+                - "5230:5230"
+              volumes:
+                - /opt/memos:/var/opt/memos
+              restart: always
+
+    - name: Start Memos container using Docker Compose
+      command: docker compose up -d
+      args:
+        chdir: /opt/memos
+      become: yes
+      become_user: jthairu

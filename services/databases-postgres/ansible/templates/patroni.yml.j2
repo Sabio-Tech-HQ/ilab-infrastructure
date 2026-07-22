@@ -11,8 +11,14 @@ etcd3:
 
 bootstrap:
   dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    synchronous_mode: false
     postgresql:
       use_pg_rewind: true
+      use_slots: true
       parameters:
         password_encryption: scram-sha-256
         shared_preload_libraries: pglogical
@@ -24,13 +30,9 @@ bootstrap:
 {% for line in cluster_settings.postgresql.pg_hba %}
         - {{ line }}
 {% endfor %}
-
-postgresql:
-  listen: 0.0.0.0:5432
-  connect_address: {{ ansible_default_ipv4.address }}:5432
-  data_dir: /var/lib/postgresql/18/main
-  bin_dir: /usr/lib/postgresql/18/bin
-  pgpass: /tmp/pgpass
+  initdb:
+    - encoding: UTF8
+    - locale: en_US.UTF-8
 
 postgresql:
   listen: 0.0.0.0:5432

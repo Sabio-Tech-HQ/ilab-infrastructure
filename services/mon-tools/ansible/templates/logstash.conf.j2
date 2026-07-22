@@ -1,0 +1,51 @@
+input {
+  beats { 
+    port => 5044 
+  }
+  http { 
+    host => "0.0.0.0"
+    port => 8080 
+  }
+}
+
+filter {
+  # 1. Determine the dataset name based on your custom fields
+  if [service] == "plex-media-server" {
+    mutate { add_field => { "[data_stream][dataset]" => "plex" } }
+  } else if [vm_name] {
+    mutate { add_field => { "[data_stream][dataset]" => "%{vm_name}" } }
+  } else if [fields][vm_name] {
+    mutate { add_field => { "[data_stream][dataset]" => "%{[fields][vm_name]}" } }
+  } else {
+    mutate { add_field => { "[data_stream][dataset]" => "mon_tools" } }
+  }
+
+  # 2. Set the required Data Stream fields
+  mutate {
+    add_field => {
+      "[data_stream][type]" => "logs"
+      "[data_stream][namespace]" => "default"
+    }
+  }
+
+  # 3. Clean the dataset name (Lowercase and replace spaces/dashes with underscores)
+  mutate {
+    lowercase => [ "[data_stream][dataset]" ]
+    gsub => [ "[data_stream][dataset]", "[ -]", "_" ]
+  }
+}
+
+output {
+  elasticsearch {
+    # Reference the container name on the monitor_network
+    hosts => ["http://elasticsearch:9200"]
+    data_stream => "true"
+    data_stream_auto_routing => "true"
+    action => "create"
+  }
+  
+  # stdout remains for debugging in 'docker logs logstash'
+  stdout { 
+    codec => rubydebug { metadata => true } 
+  }
+}

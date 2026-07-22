@@ -1,0 +1,38 @@
+---
+# roles/pacs/tasks/main.yml
+
+- name: Create application directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: jthairu
+    group: jthairu
+    mode: '0755'
+  loop:
+    - "{{ app_base_dir }}"
+    - "{{ app_base_dir }}/frontend/templates"
+
+- name: Sync frontend templates from control node
+  ansible.builtin.copy:
+    src: default.conf.template 
+    dest: "{{ app_base_dir }}/frontend/templates/"
+    owner: jthairu
+    group: jthairu
+
+- name: Deploy Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2 
+    dest: "{{ app_base_dir }}/docker-compose.yaml"
+    mode: '0644'
+
+- name: Ensure traefik-public network exists
+  community.docker.docker_network:
+    name: traefik-public
+    state: present
+
+- name: Run Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_base_dir }}"
+    state: present
+    pull: missing
+    remove_orphans: true

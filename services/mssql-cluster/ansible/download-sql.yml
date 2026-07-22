@@ -1,0 +1,56 @@
+---
+- name: Force Download and Install SQL 2022 Developer
+  hosts: sql_nodes
+  gather_facts: no
+  vars:
+    sql_svc_account: "ILAB\\sql_svc"
+    sql_svc_password: "{{ ansible_password }}"
+
+  tasks:
+    - name: Clean and Create Install Directory
+      win_file:
+        path: "C:\\sql_install"
+        state: "{{ item }}"
+      loop: [absent, directory]
+
+    - name: Download Bootstrapper
+      win_get_url:
+        url: "https://go.microsoft.com/fwlink/p/?linkid=2215158"
+        dest: "C:\\sql_install\\setup.exe"
+
+    - name: Use Bootstrapper to Download Full ISO
+      win_shell: |
+        Start-Process -FilePath "C:\sql_install\setup.exe" `
+        -ArgumentList "/Action=Download", "/MediaType=ISO", "/Language=en-US", "/OutFolder=C:\sql_install" `
+        -Wait
+      async: 1800
+      poll: 60
+
+    - name: Verify ISO Existence
+      win_shell: |
+        $file = Get-ChildItem "C:\sql_install\*.iso" | Select-Object -First 1
+        if ($file.Length -gt 1000000000) { return $file.FullName } else { exit 1 }
+      register: iso_path
+
+    - name: Mount ISO
+      win_disk_image:
+        image_path: "{{ iso_path.stdout | trim }}"
+        state: mounted
+      register: disk_image_out
+
+    - name: Run Silent Install (Enterprise Features)
+      win_package:
+        path: "{{ disk_image_out.mount_paths[0] }}setup.exe"
+        arguments:
+          - /ACTION=Install
+          - /FEATURES=SQLENGINE,CONN
+          - /INSTANCENAME=MSSQLSERVER
+          - /EDITION=Developer
+          - /SQLSVCACCOUNT="{{ sql_svc_account }}"
+          - /SQLSVCPASSWORD="{{ sql_svc_password }}"
+          - /AGTSVCACCOUNT="{{ sql_svc_account }}"
+          - /AGTSVCPASSWORD="{{ sql_svc_password }}"
+          - /SQLSYSADMINACCOUNTS="ILAB\Administrator"
+          - /IACCEPTSQLSERVERLICENSETERMS
+          - /QUIET
+        state: present

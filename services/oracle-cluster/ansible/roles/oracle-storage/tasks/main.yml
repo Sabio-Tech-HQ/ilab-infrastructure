@@ -1,0 +1,26 @@
+---
+- name: Install iSCSI initiator
+  ansible.builtin.package:
+    name: iscsi-initiator-utils
+    state: present
+
+- name: Set Initiator Name
+  ansible.builtin.copy:
+    content: "InitiatorName=iqn.2026-02.ilab:node-{{ node_id }}\n"
+    dest: /etc/iscsi/initiatorname.iscsi
+
+- name: Discover and Login to Storage GW
+  ansible.builtin.shell: |
+    iscsiadm -m discovery -t sendtargets -p 10.10.20.144
+    iscsiadm -m node -T iqn.2026-02.ilab:oracle-cluster -l
+  register: login_out
+  changed_when: "'Login to' in login_out.stdout"
+  failed_when: false # Prevents failing if already logged in
+
+- name: Deploy udev rules for ASM permissions
+  ansible.builtin.template:
+    src: 99-oracle-asm.rules.j2
+    dest: /etc/udev/rules.d/99-oracle-asm.rules
+
+- name: Reload udev rules
+  ansible.builtin.command: udevadm control --reload-rules && udevadm trigger

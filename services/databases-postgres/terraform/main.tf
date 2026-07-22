@@ -10,21 +10,18 @@ resource "postgresql_role" "jthairu" {
 resource "postgresql_database" "pacs" {
   name       = "pacs"
   owner      = "pacs"
-  lc_collate = "en_US.UTF-8"
 }
 
 # Airflow database - Updated owner to airflow
 resource "postgresql_database" "airflow" {
   name       = "airflow"
   owner      = "airflow"
-  lc_collate = "en_US.UTF-8"
 }
 
 # Vitals database - Updated owner to vitals
 resource "postgresql_database" "vitals" {
   name       = "vitals"
   owner      = "vitals"
-  lc_collate = "en_US.UTF-8"
 }
 
 locals {
@@ -76,5 +73,14 @@ resource "postgresql_grant" "revoke_public_access" {
   database    = each.value
   role        = "public"
   object_type = "database"
-  privileges  = [] # Revokes all, including CONNECT
+  privileges  = [] 
+
+  # Force Terraform to wait for the database to exist
+  depends_on = [
+    postgresql_database.pacs,
+    postgresql_database.airflow,
+    postgresql_database.vitals,
+    postgresql_database.media_dbs_main,
+    postgresql_database.media_dbs_log
+  ]
 }

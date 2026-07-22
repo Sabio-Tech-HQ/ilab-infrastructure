@@ -1,4 +1,4 @@
-# Terraform local state and plugins
+# --- Terraform ---
 # Ignore ALL terraform state files
 *.tfstate
 *.tfstate.*
@@ -10,19 +10,11 @@
 
 # Ignore the terraform binary folders
 .terraform/
+crash.log
 
-
-# Ignore the terraform binary folders
-.terraform/
-
-# Ansible
+# --- Ansible ---
 **/ansible.log
 **/vault_pass.txt
-
-# System Files
-.DS_Store
-
-#inventory
 inventory.ini
 
 # --- WireGuard Keys ---
@@ -32,8 +24,21 @@ publickey
 client_*.conf
 *.key
 
+# --- Kubernetes & Talos ---
+talosconfig
+kubeconfig
+*.kubeconfig
 
-# --- General ---
+# --- SSH & Certificates ---
+*.pem
+id_rsa
+id_ed25519
+
+# --- General & System ---
+.DS_Store
 .env
 /tmp/acme.json
 /tmp/*.json
+
+# --- App Data ---
+services/kafka-connect/cassandra_data/

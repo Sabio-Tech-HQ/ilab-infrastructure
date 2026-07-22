@@ -1,0 +1,170 @@
+---
+- name: Install MariaDB and Configure Cluster
+  hosts: mariadb_cluster
+  become: yes
+  vars_files:
+    - "../../../ansible/group_vars/all/vars.yml"
+    - "../../../ansible/group_vars/all/vault.yml"
+
+  tasks:
+    - name: Install prerequisites
+      apt:
+        name: ['apt-transport-https', 'curl', 'python3-pymysql']
+        state: present
+        update_cache: yes
+
+    - name: Add MariaDB GPG key
+      apt_key:
+        url: https://mariadb.org/mariadb_release_signing_key.asc
+        state: present
+
+    - name: Add MariaDB 11.4 Repository
+      apt_repository:
+        repo: "deb [arch=amd64,arm64] https://deb.mariadb.org/11.4/ubuntu {{ ansible_distribution_release }} main"
+        state: present
+
+    - name: Install MariaDB Server
+      apt:
+        name: mariadb-server
+        state: present
+
+    # --- CONFIGURATION SECTION ---
+
+    - name: Configure MariaDB Basic Settings
+      lineinfile:
+        path: /etc/mysql/mariadb.conf.d/50-server.cnf
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: '^bind-address', line: 'bind-address = 0.0.0.0' }
+        - { regexp: '^#?server-id', line: "server-id = {{ ansible_host.split('.')[-1] }}" }
+        - { regexp: '^#?log_bin', line: "log_bin = /var/log/mysql/mariadb-bin" }
+        - { regexp: '^#?gtid_domain_id', line: "gtid_domain_id = 1" }
+      notify: Restart MariaDB
+
+    - name: Set Slaves to Read-Only (Safety First)
+      lineinfile:
+        path: /etc/mysql/mariadb.conf.d/50-server.cnf
+        regexp: '^#?read_only'
+        line: "read_only = 1"
+      when: inventory_hostname != "mariadb-01"
+      notify: Restart MariaDB
+
+    - name: Ensure MariaDB is running
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    - name: Flush handlers (Ensure Server IDs are unique before proceeding)
+      meta: flush_handlers
+
+    # --- USER MANAGEMENT (MASTER ONLY) ---
+
+    - name: Update MariaDB root password (Master only)
+      mysql_user:
+        name: "{{ mariadb_root_username }}"
+        host: "{{ item }}"
+        password: "{{ mariadb_root_password }}"
+        priv: "*.*:ALL,GRANT"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+        state: present
+      loop:
+        - "localhost"
+        - "127.0.0.1"
+        - "%"
+      when: inventory_hostname == "mariadb-01"
+
+    - name: Create application database (Master only)
+      mysql_db:
+        name: pacsdb    
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+      when: inventory_hostname == "mariadb-01"
+
+    - name: Create Application User (Master and Replicas via Replication or explicit creation)
+      mysql_user:
+        name: "pacs"
+        host: "%"
+        password: "{{ pacs_db_password | default('ChangeMe123!') }}"
+        priv: "pacsdb.*:SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,INDEX,ALTER,REFERENCES,TRIGGER"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+        state: present
+
+    - name: Create Replication User (Master only)
+      mysql_user:
+        name: "replicant"
+        host: "10.10.10.%"
+        password: "{{ mariadb_root_password }}"
+        priv: "*.*:REPLICATION SLAVE"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+        state: present
+      when: inventory_hostname == "mariadb-01"
+
+    - name: Ensure maxscale_mon user exists across all database nodes
+      mysql_user:
+        name: "maxscale_mon"
+        host: "%"
+        password: "{{ maxscale_mon_password }}"
+        priv:
+          "mysql.*": "SELECT"
+          "*.*": "SHOW DATABASES,REPLICATION CLIENT,SLAVE MONITOR"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+        state: present
+
+    # --- REPLICATION SETUP (SLAVES ONLY) ---
+
+    - name: Get Replica status (Slaves only)
+      mysql_replication:
+        mode: getreplica
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      register: replica_status
+      when: inventory_hostname != "mariadb-01"
+      ignore_errors: yes
+
+    - name: Stop Replica explicitly before reconfiguring (Slaves only)
+      mysql_replication:
+        mode: stopreplica
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      when: inventory_hostname != "mariadb-01"
+      ignore_errors: yes
+
+    - name: Configure Replication link (Slaves only)
+      mysql_replication:
+        mode: changeprimary
+        primary_host: "10.10.10.41"
+        primary_user: "replicant"
+        primary_password: "{{ mariadb_root_password }}"
+        primary_use_gtid: replica_pos
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      when: inventory_hostname != "mariadb-01"
+
+    - name: Start Replica (Slaves only)
+      mysql_replication:
+        mode: startreplica
+        login_user: "{{ mariadb_root_username }}"
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      when: inventory_hostname != "mariadb-01"
+
+  handlers:
+    - name: Restart MariaDB
+      service:
+        name: mariadb
+        state: restarted

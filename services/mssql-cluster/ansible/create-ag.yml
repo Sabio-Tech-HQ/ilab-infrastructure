@@ -1,0 +1,45 @@
+---
+- name: Configure SQL Always On Availability Group
+  hosts: sql-node-01
+  vars:
+    ag_name: "ILAB-AG01"
+    listener_name: "ILAB-SQL-LST"
+    listener_ip: "10.10.10.77" # Updated IP
+    listener_mask: "255.255.255.0"
+    sql_svc_account: "ILAB\\sql_svc"
+
+  tasks:
+    - name: Ensure Mirroring Endpoints Exist (Run via Invoke-Sqlcmd)
+      win_shell: |
+        $nodes = @("sql-node-01", "sql-node-02", "sql-node-03")
+        foreach ($node in $nodes) {
+            Invoke-Sqlcmd -ServerInstance $node -Query "
+            IF NOT EXISTS (SELECT * FROM sys.endpoints WHERE name = 'Hadr_endpoint')
+            BEGIN
+                CREATE ENDPOINT [Hadr_endpoint] STATE=STARTED AS TCP (LISTENER_PORT = 5022) 
+                FOR DATA_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES);
+            END"
+        }
+      become: yes
+      become_user: "Administrator@ilab.local"
+
+    - name: Create the Availability Group
+      win_shell: |
+        $ag_query = @"
+        CREATE AVAILABILITY GROUP [{{ ag_name }}]
+        WITH (AUTOMATED_BACKUP_PREFERENCE = SECONDARY, FAILURE_CONDITION_LEVEL = 3, HEALTH_CHECK_TIMEOUT = 30000)
+        FOR REPLICA ON 
+            'sql-node-01' WITH (ENDPOINT_URL = 'TCP://sql-node-01.ilab.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = ALL)),
+            'sql-node-02' WITH (ENDPOINT_URL = 'TCP://sql-node-02.ilab.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = ALL)),
+            'sql-node-03' WITH (ENDPOINT_URL = 'TCP://sql-node-03.ilab.local:5022', FAILOVER_MODE = MANUAL, AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = ALL));
+        "@
+        Invoke-Sqlcmd -ServerInstance "sql-node-01" -Query $ag_query
+      become: yes
+      become_user: "Administrator@ilab.local"
+
+    - name: Create the AG Listener on .77
+      win_shell: |
+        $list_query = "ALTER AVAILABILITY GROUP [{{ ag_name }}] ADD LISTENER '{{ listener_name }}' (WITH IP (('{{ listener_ip }}', '{{ listener_mask }}')), PORT 1433);"
+        Invoke-Sqlcmd -ServerInstance "sql-node-01" -Query $list_query
+      become: yes
+      become_user: "Administrator@ilab.local"

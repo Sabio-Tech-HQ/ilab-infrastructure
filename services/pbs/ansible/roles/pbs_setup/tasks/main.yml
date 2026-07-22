@@ -1,0 +1,45 @@
+- name: Create PBS datastore mount point
+  file:
+    path: "{{ pbs_mount_point }}"
+    state: directory
+
+- name: Ensure required packages are installed
+  apt:
+    name:
+      - nfs-common
+      - proxmox-backup-server
+    state: present
+    update_cache: yes
+
+- name: Mount NAS datastore via NFS
+  mount:
+    path: "{{ pbs_mount_point }}"
+    src: "{{ nas_ip }}:{{ pbs_nas_path }}"
+    fstype: nfs
+    opts: rw,soft,nfsvers=4.1
+    state: mounted
+
+# REMOVED: "Set ownership for PBS Datastore" task here because it causes 
+# EPERM errors on NFS mounts. The "Map all users to admin" setting 
+# on the Synology NAS handles this permission requirement instead.
+
+- name: Initialize PBS Datastore
+  shell: |
+    if ! proxmox-backup-manager datastore list --output-format json | grep -q '"name":"nas-datastore"'; then
+      proxmox-backup-manager datastore create nas-datastore {{ pbs_mount_point }}
+    else
+      echo "Datastore already exists"
+    fi
+  register: datastore_result
+  # Use changed_when to avoid unnecessary re-runs
+  changed_when: "'nas-datastore' not in datastore_result.stdout"
+  failed_when: datastore_result.rc != 0
+
+- name: Ensure PBS services are enabled and running
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - proxmox-backup
+    - proxmox-backup-proxy

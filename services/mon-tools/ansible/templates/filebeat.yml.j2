@@ -1,0 +1,7 @@
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: true  # Automatically detects logs from other containers
+
+output.logstash:
+  hosts: ["logstash:5044"] # Reference the Logstash container name

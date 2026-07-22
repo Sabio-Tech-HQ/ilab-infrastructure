@@ -100,14 +100,6 @@ http:
       tls:
         certResolver: route53_aws
 
-    jackett:
-      rule: "Host(`jackett.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: jackett-service
-      tls:
-        certResolver: route53_aws
-
     nzbget:
       rule: "Host(`nzbget.mwakilishi.com`)"
       entryPoints:
@@ -124,27 +116,11 @@ http:
       tls:
         certResolver: route53_aws
 
-    qbittorrent:
-      rule: "Host(`qbit.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: qbittorrent-service
-      tls:
-        certResolver: route53_aws
-
     jellyfin:
       rule: "Host(`jellyfin.mwakilishi.com`)"
       entryPoints:
         - websecure
       service: jellyfin-service
-      tls:
-        certResolver: route53_aws
-
-    jfin:
-      rule: "Host(`jfin.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: jfin-service
       tls:
         certResolver: route53_aws
 
@@ -185,14 +161,6 @@ http:
       entryPoints:
         - websecure
       service: vault-service
-      tls:
-        certResolver: route53_aws
-
-    nextcloud:
-      rule: "Host(`nextcloud.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: nextcloud-service
       tls:
         certResolver: route53_aws
 
@@ -244,7 +212,22 @@ http:
       tls:
         certResolver: route53_aws
 
-    pacs3:
+    kibana:
+      rule: "Host(`kibana.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: kibana-service
+      tls:
+        certResolver: route53_aws
+    drupal:
+      rule: "Host(`drupal.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: drupal-service
+      tls:
+        certResolver: route53_aws
+    
+    pacs:
       rule: "Host(`pacs.mwakilishi.com`)"
       entryPoints:
         - websecure
@@ -252,11 +235,98 @@ http:
       tls:
         certResolver: route53_aws
 
+    kafka:
+      rule: "Host(`kafka.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: kafka-service
+      tls:
+        certResolver: route53_aws
+
+    devops:
+      rule: "Host(`devops.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: devops-service
+      tls:
+        certResolver: route53_aws
+
+    member.devops:
+      rule: "Host(`member.devops.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: devops-service
+      tls:
+        certResolver: route53_aws
+    nidate.devops:
+      rule: "Host(`nidate.devops.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: devops-service 
+      tls:
+        certResolver: route53_aws
+    memos:
+      rule: "Host(`memos.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: memos-service
+      tls:
+        certResolver: route53_aws
+    haproxy:
+      rule: "Host(`haproxy.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: haproxy-service
+      tls:
+        certResolver: route53_aws
+    maxscale:
+      rule: "Host(`maxscale.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: maxscale-service
+      tls:
+        certResolver: route53_aws
+
   services:
+
+    maxscale-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.50:8989/"
+    
+    haproxy-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.200:8080/"
+
+    memos-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.35:5230/"
+
+    devops-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.216:80"
+   
+    kafka-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.216:8088"
+
+    kibana-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.90:5601"
+
     pacs-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.99:80"
+          - url: "http://10.10.10.99:8090"
+    drupal-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.99:8085"
 
     superset-service:
       loadBalancer:
@@ -266,7 +336,7 @@ http:
     airflow-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.208:8080"
+          - url: "http://10.10.10.216:8080"
 
     pihole01-service:
       loadBalancer:
@@ -333,27 +403,12 @@ http:
         servers:
           - url: "http://10.10.10.30:8686"
 
-    jackett-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.30:9117"
-
     nzbget-service:
       loadBalancer:
         servers:
           - url: "http://10.10.10.30:6789"
 
-    qbittorrent-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.30:8080"
-
     jellyfin-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.65:8096"
-    
-    jfin-service:
       loadBalancer:
         servers:
           - url: "http://10.10.10.65:8096"
@@ -382,11 +437,6 @@ http:
       loadBalancer:
         servers:
           - url: "http://10.10.10.45:8080"
-
-    nextcloud-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.40:8080"
 
     ilab1-service:
       loadBalancer:

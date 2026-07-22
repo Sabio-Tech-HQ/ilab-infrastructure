@@ -1,0 +1,27 @@
+---
+- name: Promote dc-01 to Domain Controller
+  hosts: dc
+  gather_facts: yes
+  vars:
+    domain_name: "ilab.local"
+    # Using your vault password for the Directory Services Restore Mode (DSRM)
+    safe_mode_password: "{{ ansible_password }}"
+
+  tasks:
+    - name: Install AD-Domain-Services role
+      win_feature:
+        name: AD-Domain-Services
+        include_management_tools: yes
+        state: present
+
+    - name: Promote to Domain Controller (New Forest)
+      win_domain:
+        dns_domain_name: "{{ domain_name }}"
+        safe_mode_password: "{{ safe_mode_password }}"
+      register: ad_promotion
+
+    - name: Reboot after Promotion
+      win_reboot:
+        msg: "Rebooting to finalize Domain Controller promotion"
+        pre_reboot_delay: 15
+      when: ad_promotion.reboot_required

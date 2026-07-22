@@ -1,0 +1,12 @@
+---
+- name: Deploy PACS and Mwakilishi Stacks
+  hosts: web_servers
+  become: true
+  
+  vars_files:
+    - "../../../ansible/group_vars/all/vars.yml"
+    - "../../../ansible/group_vars/all/vault.yml"
+
+  roles:
+    - pacs
+    - mwakilishi

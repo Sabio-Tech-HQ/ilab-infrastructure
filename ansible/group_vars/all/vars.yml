@@ -48,10 +48,11 @@ postgres_host: 10.10.10.200
 loki_url: "http://10.10.10.90:3100/loki/api/v1/push"
 
 #traefik
-traefik_acme_email: "mwakilishi@gmail.com"
-traefik_dir: "/etc/traefik"
+traefik_acme_email: "{{ traefik_acme_email }}"
+traefik_dir: "/opt/traefik"
 aws_access_key: "{{ vault_aws_access_key }}"
 aws_secret_key: "{{ vault_aws_secret_key }}"
+
 airflow_fernet_key : "{{ airflow_fernet_key }}"
 
 #mariadb
@@ -59,5 +60,50 @@ pacsdb_password: "{{ pacsdb_password }}"
 vrrp_password: "{{ vrrp_password }}"
 vrrp_vip: "10.10.10.50"
 
+mariadb_root_username: "root"
 mariadb_root_password:  "{{ mariadb_root_password }}"
 
+plex_claim_token:  "{{ plex_claim_token }}"
+
+#mon tools
+
+# Path Migration
+montools_base_dir: "/opt/mon-tools"
+
+grafana_admin_password: "{{ grafana_admin_password }}"
+smtp_user: "{{ smtp_user }}"
+smtp_pass: "{{ smtp_pass }}"
+
+elastic_version: "9.2.2"
+
+kafka_brokers:
+  - 10.10.10.235
+  - 10.10.10.236
+  - 10.10.10.237
+
+kibana_encryption_key: " {{ kibana_encryption_key }}"
+
+# web server
+pacs_base_dir: "/home/jthairu/docker"
+pacs_db_user: "pacs"
+pacs_db_name: "pacs"
+pacs_db_password: "{{ pacs_db_password }}"
+pacs_domain: "mwakilishi.com"
+pacs_api_domain: "pacs-backend:8000"
+
+app_base_dir: "/home/jthairu/docker"
+
+mwakilishi_base_dir: "/home/jthairu/mwakilishi-site"
+mwakilishi_domain: "mwakilishi.com"
+mwakilishi_db_name: "{{ mwakilishi_db_name }}"
+mwakilishi_db_user: "{{ mwakilishi_db_user }}"
+mwakilishi_db_password: "{{ mwakilishi_db_password }}"
+
+oracle_password: "{{ oracle_password }}"
+
+
+pbs_nas_path: "/volume1/pbs" 
+pbs_mount_point: "/mnt/datastore"
+
+memos_base_dir: "/opt/memos"
+memos_data_dir: "/var/opt/memos"

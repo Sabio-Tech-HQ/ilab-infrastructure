@@ -1,0 +1,79 @@
+---
+- name: Install and Configure Keepalived for MaxScale HA
+  hosts: maxscale
+  become: yes
+  vars_files:
+    - "../../../ansible/group_vars/all/vars.yml"
+    - "../../../ansible/group_vars/all/vault.yml"
+
+  vars:
+    keepalived_vip: "10.10.10.50"
+    keepalived_interface: "eth0" # Update to match your interface name if different (e.g., ens33)
+    keepalived_router_id: 51
+    # maxscale-01 gets priority 101 (Master), maxscale-02 gets 100 (Backup)
+    keepalived_priority: "{{ 101 if inventory_hostname == 'maxscale-01' else 100 }}"
+    keepalived_state: "{{ 'MASTER' if inventory_hostname == 'maxscale-01' else 'BACKUP' }}"
+
+  tasks:
+    - name: Install Keepalived
+      apt:
+        name: keepalived
+        state: present
+        update_cache: yes
+
+    - name: Ensure MaxScale health check script exists
+      copy:
+        dest: /usr/local/bin/check_maxscale.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          /usr/bin/killall -0 maxscale
+
+    - name: Configure Keepalived (keepalived.conf)
+      copy:
+        dest: /etc/keepalived/keepalived.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          vrrp_script check_maxscale {
+              script "/usr/local/bin/check_maxscale.sh"
+              interval 2
+              weight 2
+          }
+
+          vrrp_instance VI_1 {
+              state {{ keepalived_state }}
+              interface {{ keepalived_interface }}
+              virtual_router_id {{ keepalived_router_id }}
+              priority {{ keepalived_priority }}
+              advert_int 1
+              
+              authentication {
+                  auth_type PASS
+                  auth_pass {{ keepalived_auth_password | default('SecretKeepalivedPass') }}
+              }
+
+              virtual_ipaddress {
+                  {{ keepalived_vip }}
+              }
+
+              track_script {
+                  check_maxscale
+              }
+          }
+      notify: Restart Keepalived
+
+    - name: Enable and start Keepalived service
+      service:
+        name: keepalived
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart Keepalived
+      service:
+        name: keepalived
+        state: restarted

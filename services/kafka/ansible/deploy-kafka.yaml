@@ -1,16 +1,14 @@
 ---
-- name: Deploy Kafka Service
+- name: Deploy Kafka Service with Monitoring
   hosts: kafka
   become: true
   vars:
     kafka_dir: "/opt/kafka"
-    # The IP the VM uses to talk to clients
-    advertised_ip: "10.10.10.235" 
 
   tasks:
-    - name: Ensure Docker is installed
+    - name: Ensure baseline tools are installed
       ansible.builtin.apt:
-        name: [docker.io, docker-compose-v2]
+        name: [docker.io, docker-compose-v2, curl, jq]
         state: present
         update_cache: yes
 
@@ -21,8 +19,29 @@
         mode: '0755'
       loop:
         - "{{ kafka_dir }}"
-        - "{{ kafka_dir }}/zookeeper_data"
         - "{{ kafka_dir }}/kafka_data"
+        - "{{ kafka_dir }}/prometheus"
+
+    # 1. Download the JMX Exporter JAR
+    - name: Download JMX Exporter JAR
+      ansible.builtin.get_url:
+        url: https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar
+        dest: "{{ kafka_dir }}/prometheus/jmx_exporter.jar"
+        mode: '0644'
+
+    # 2. Deploy CLEAN Kafka Metrics Config (Fixed Regex)
+    - name: Deploy JMX Exporter Config
+      ansible.builtin.copy:
+        dest: "{{ kafka_dir }}/prometheus/kafka-config.yaml"
+        content: |
+          lowercaseOutputName: true
+          rules:
+            - pattern: kafka.server<type=BrokerTopicMetrics, name=(.+)><>(Count|Value)
+              name: kafka_server_brokertopicmetrics_$1
+            - pattern: kafka.server<type=(.+), name=(.+)><>(Count|Value)
+              name: kafka_server_$1_$2
+            - pattern: kafka.(\w+)<type=(.+), name=(.+)><>(Count|Value)
+              name: kafka_$1_$2_$3
 
     - name: Deploy Docker Compose Template
       ansible.builtin.template:

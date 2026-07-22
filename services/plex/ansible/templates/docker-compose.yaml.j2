@@ -1,36 +1,36 @@
 services:
-  watchtower-plex:
-    image: containrrr/watchtower
-    container_name: watchtower-plex
-    logging: 
-      driver: loki
-      options:
-        loki-url: "{{ loki_url }}"
-    restart: always
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - WATCHTOWER_LABEL_ENABLE=true
-      - WATCHTOWER_CLEANUP=true
+  #watchtower-plex:
+  #  image: containrrr/watchtower
+  #  container_name: watchtower-plex
+  #  logging: 
+  #    driver: loki
+  #    options:
+  #      loki-url: "{{ loki_url }}"
+  #  restart: always
+  #  volumes:
+  #    - /var/run/docker.sock:/var/run/docker.sock
+  #  environment:
+  #    - WATCHTOWER_LABEL_ENABLE=true
+  #    - WATCHTOWER_CLEANUP=true
 
   plex:
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
     network_mode: host
-    logging: 
-      driver: loki
-      options:
-        loki-url: "{{ loki_url }}"
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    #logging: 
+    #  driver: loki
+    #  options:
+    #    loki-url: "{{ loki_url }}"
+    #labels:
+    #  - "com.centurylinklabs.watchtower.enable=true"
     environment:
       - PUID={{ admin_uid }}
       - PGID={{ admin_gid }}
       - TZ={{ timezone }}
       - VERSION=docker
+      - PLEX_CLAIM={{ plex_claim_token }}
     volumes:
-      - {{ plex_root }}/plex/config:/config
-      - {{ plex_root }}/plex/config:/plex-logs:ro
+      - {{ plex_root }}/config:/config
       - {{ video_path }}/series:/tv
       - {{ video_path }}/movies:/movies
       - {{ video_path }}/whisparr:/whisparr

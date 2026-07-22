@@ -2,29 +2,39 @@ services:
   kafka:
     image: apache/kafka:4.2.0
     container_name: kafka
-    # Open both the client port AND the cluster communication port
+    # Added 8090 for Prometheus scraping
     ports:
       - "9092:9092"
-      - "9093:9093" 
+      - "9093:9093"
+      - "8090:8090"
     environment:
       - KAFKA_NODE_ID={{ kafka_node_id }}
       - KAFKA_PROCESS_ROLES=controller,broker
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@10.10.10.235:9093,2@10.10.10.236:9093,3@10.10.10.237:9093
       
-      # Use 0.0.0.0 to ensure it binds to the VM's network interface
+      # Networking
       - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://{{ inventory_hostname }}:9092
+
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME=debezium-connect
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS=http://{{ inventory_hostname }}:8083
       
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
       
-      # Ensure this matches the volume path below
+      # Data and Cluster Config
       - KAFKA_LOG_DIRS=/var/lib/kafka/data
       - CLUSTER_ID=5L6g3nShT-eMCtK--X86sw
       
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=2
+
+      # MONITORING: This is the magic line that opens port 8090
+      - KAFKA_OPTS=-javaagent:/usr/share/kafka/prometheus/jmx_exporter.jar=8090:/usr/share/kafka/prometheus/kafka-config.yaml
+      
     volumes:
       - /opt/kafka/kafka_data:/var/lib/kafka/data
+      # Mount the exporter files we downloaded in the playbook
+      - /opt/kafka/prometheus:/usr/share/kafka/prometheus:ro

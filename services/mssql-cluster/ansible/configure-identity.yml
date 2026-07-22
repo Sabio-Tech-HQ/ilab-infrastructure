@@ -1,0 +1,36 @@
+---
+- name: Configure Windows Identity and Static IPs
+  hosts: all
+  gather_facts: yes
+  vars:
+    # Mapping intended IPs and Hostnames
+    network_config:
+      dc-01: { ip: "10.10.10.104", gw: "10.10.10.1", dns: "8.8.8.8" }
+      sql-node-01: { ip: "10.10.10.71", gw: "10.10.10.1", dns: "10.10.10.104" }
+      sql-node-02: { ip: "10.10.10.73", gw: "10.10.10.1", dns: "10.10.10.104" }
+      sql-node-03: { ip: "10.10.10.72", gw: "10.10.10.1", dns: "10.10.10.104" }
+
+  tasks:
+    - name: Set Computer Hostname
+      win_hostname:
+        name: "{{ inventory_hostname }}"
+      register: reboot_required
+
+    - name: Configure Static IP Address
+      win_shell: |
+        $adapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1
+        $config = @{
+            InterfaceIndex = $adapter.InterfaceIndex
+            IPAddress      = "{{ network_config[inventory_hostname].ip }}"
+            PrefixLength   = 24
+            DefaultGateway = "{{ network_config[inventory_hostname].gw }}"
+        }
+        # Only set if not already set to prevent connection loss loops
+        if ((Get-NetIPAddress -InterfaceIndex $adapter.InterfaceIndex -AddressFamily IPv4).IPAddress -notcontains $config.IPAddress) {
+            New-NetIPAddress @config
+            Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses ("{{ network_config[inventory_hostname].dns }}")
+        }
+
+    - name: Reboot to apply changes
+      win_reboot:
+      when: reboot_required.reboot_required

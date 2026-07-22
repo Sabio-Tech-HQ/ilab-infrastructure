@@ -1,0 +1,2 @@
+# Map any SCSI device with a UUID to our oracleasm path
+KERNEL=="sd*", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u /dev/%k", RESULT=="?*", SYMLINK+="oracleasm/disks/asm_disk1", OWNER="oracle", GROUP="dba", MODE="0660"

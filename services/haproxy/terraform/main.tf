@@ -5,7 +5,7 @@ resource "proxmox_virtual_environment_vm" "haproxy_cluster" {
   node_name = "ilab-node-03" 
 
   clone {
-    vm_id = 1003 
+    vm_id = 1009 
   }
 
   initialization {
@@ -22,7 +22,11 @@ resource "proxmox_virtual_environment_vm" "haproxy_cluster" {
 
     user_account {
       username = var.ssh_user
-      keys     = split(", ", var.ssh_public_key)
+      keys     = [
+        var.ssh_public_key,
+        file("/home/jthairu/.ssh/id_ed25519.pub")
+      ]
+      password = var.ssh_password  
     }
   }
 

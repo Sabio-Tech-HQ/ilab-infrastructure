@@ -7,6 +7,11 @@ services:
     environment:
       - KAFKA_CLUSTERS_0_NAME=iLab-Cluster
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=10.10.10.235:9092,10.10.10.236:9092,10.10.10.237:9092
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME=Debezium
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS=http://10.10.10.216:8083
       - KAFKA_CLUSTERS_0_METRICS_PORT=9092
       - DYNAMIC_CONFIG_ENABLED=true
+      - CONNECT_PLUGIN_PATH=/kafka/connect,/data/connect-plugins
     restart: always
+    volumes:
+      - /home/jthairu/docker/plugins:/data/connect-plugins

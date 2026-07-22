@@ -1,0 +1,190 @@
+---
+- name: Deploy Complete Monitoring Stack to mon-tools
+  hosts: mon-tools
+  become: yes
+
+  vars_files:
+    - "../../../ansible/group_vars/all/vars.yml"
+    - "../../../ansible/group_vars/all/vault.yml"
+
+  tasks:
+    # 0. SYSTEM PREP: Install tools and fix kernel limits
+    - name: Ensure baseline tools are installed
+      apt:
+        name:
+          - jq
+          - curl
+          - net-tools
+          - vim
+        state: present
+        update_cache: yes
+
+    - name: Set vm.max_map_count for Elasticsearch
+      ansible.posix.sysctl:
+        name: vm.max_map_count
+        value: '262144'
+        state: present
+        reload: yes
+
+    # 1. INFRASTRUCTURE: Setup Directories
+    - name: Create /opt/mon-tools directory structure
+      file:
+        path: "{{ montools_base_dir }}/{{ item }}"
+        state: directory
+        owner: jthairu
+        group: jthairu
+        mode: '0755'
+      loop:
+        - "influxdb/data"
+        - "influxdb/config"
+        - "grafana"
+        - "loki/config"
+        - "loki/data"
+        - "alloy/config"
+        - "alloy/data"
+        - "prometheus/data"
+        - "elasticsearch/data"
+        - "logstash/pipeline"
+        - "kibana/config"
+        - "filebeat"
+        - "metricbeat"
+
+    - name: Ensure Loki data directory has correct ownership for container user
+      file:
+        path: "{{ montools_base_dir }}/loki/data"
+        owner: "10001"
+        group: "10001"
+        recurse: yes
+
+    # 2. CONFIGURATION: Deploy Templates
+    - name: Deploy Service Configurations
+      template:
+        src: "{{ item.src }}"
+        dest: "{{ montools_base_dir }}/{{ item.dest }}"
+        owner: "{{ item.owner | default('jthairu') }}"
+        mode: '0644'
+      loop:
+        - { src: 'prometheus.yml.j2', dest: 'prometheus/prometheus.yml' }
+        - { src: 'loki-config.yaml.j2', dest: 'loki/config/config.yaml' }
+        - { src: 'config.alloy.j2', dest: 'alloy/config/config.alloy' }
+        - { src: 'kibana.yml.j2', dest: 'kibana/config/kibana.yml', owner: '1000' }
+        - { src: 'logstash.conf.j2', dest: 'logstash/pipeline/logstash.conf', owner: '1000' }
+        - { src: 'filebeat.yml.j2', dest: 'filebeat/filebeat.yml', owner: 'root' }
+        - { src: 'metricbeat.yml.j2', dest: 'metricbeat/metricbeat.yml', owner: 'root' }
+
+    # 3. NETWORKING
+    - name: Deploy Monitoring Network
+      community.docker.docker_network:
+        name: monitor_network
+
+    # 4. CORE SERVICES: Metrics & Logs
+    - name: Start Prometheus
+      community.docker.docker_container:
+        name: prometheus
+        image: prom/prometheus:latest
+        restart_policy: unless-stopped
+        networks: [{name: monitor_network}]
+        ports: ["9090:9090"]
+        volumes:
+          - "{{ montools_base_dir }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
+          - "{{ montools_base_dir }}/prometheus/data:/prometheus"
+
+    - name: Start Loki
+      community.docker.docker_container:
+        name: loki
+        image: grafana/loki:latest
+        restart_policy: unless-stopped
+        user: "10001:10001"
+        networks: [{name: monitor_network}]
+        ports: ["3100:3100"]
+        volumes:
+          - "{{ montools_base_dir }}/loki/config/config.yaml:/etc/loki/config.yaml:ro"
+          - "{{ montools_base_dir }}/loki/data:/loki:rw"
+        command: "-config.file=/etc/loki/config.yaml"
+
+    # 5. VISUALIZATION: Grafana & Kibana
+    - name: Start Grafana
+      community.docker.docker_container:
+        name: grafana
+        image: "grafana/grafana:latest"
+        restart_policy: unless-stopped
+        networks: [{name: monitor_network}]
+        ports: ["3000:3000"]
+        volumes: ["{{ montools_base_dir }}/grafana:/var/lib/grafana"]
+        user: "1000:1000"
+        env:
+          GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
+          GF_SMTP_ENABLED: "true"
+          GF_SMTP_USER: "{{ smtp_user }}"
+          GF_SMTP_PASSWORD: "{{ smtp_pass }}"
+
+    - name: Start Kibana
+      community.docker.docker_container:
+        name: kibana
+        image: "docker.elastic.co/kibana/kibana:9.2.2"
+        restart_policy: unless-stopped
+        networks: [{name: monitor_network}]
+        ports: ["5601:5601"]
+        volumes: ["{{ montools_base_dir }}/kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml:ro"]
+
+    # 6. ELASTIC STACK: Storage & Pipelines
+    - name: Start Elasticsearch
+      community.docker.docker_container:
+        name: elasticsearch
+        image: "docker.elastic.co/elasticsearch/elasticsearch:9.2.2"
+        restart_policy: unless-stopped
+        networks: [{name: monitor_network}]
+        ports: ["9200:9200"]
+        env: { discovery.type: "single-node", xpack.security.enabled: "false" }
+        volumes: ["{{ montools_base_dir }}/elasticsearch/data:/usr/share/elasticsearch/data"]
+
+    - name: Start Logstash
+      community.docker.docker_container:
+        name: logstash
+        image: "docker.elastic.co/logstash/logstash:9.2.2"
+        restart_policy: unless-stopped
+        networks: [{name: monitor_network}]
+        ports: ["5044:5044", "8080:8080"]
+        volumes: ["{{ montools_base_dir }}/logstash/pipeline:/usr/share/logstash/pipeline:ro"]
+
+    # 7. AGENTS: Beats & Alloy
+    - name: Start Filebeat
+      community.docker.docker_container:
+        name: filebeat
+        image: "docker.elastic.co/beats/filebeat:9.2.2"
+        user: root
+        restart_policy: unless-stopped
+        networks: [{name: monitor_network}]
+        volumes:
+          - "{{ montools_base_dir }}/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro"
+          - "/var/lib/docker/containers:/var/lib/docker/containers:ro"
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+    - name: Start Metricbeat
+      community.docker.docker_container:
+        name: metricbeat
+        image: "docker.elastic.co/beats/metricbeat:9.2.2"
+        user: root
+        restart_policy: unless-stopped
+        networks: [{name: monitor_network}]
+        command: metricbeat -e --system.hostfs=/hostfs --strict.perms=false
+        volumes:
+          - "{{ montools_base_dir }}/metricbeat/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro"
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+          - "/proc:/hostfs/proc:ro"
+          - "/sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro"
+          - "/:/hostfs:ro"
+
+    - name: Start Alloy
+      community.docker.docker_container:
+        name: alloy
+        image: grafana/alloy:v1.10.2
+        user: "0:0"
+        restart_policy: unless-stopped
+        networks: [{name: monitor_network}]
+        ports: ["12345:12345"]
+        volumes:
+          - "{{ montools_base_dir }}/alloy/config/config.alloy:/etc/alloy/config.alloy:ro"
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+          - "/var/log:/var/log:ro"
+        command: ["run", "--server.http.listen-addr=0.0.0.0:12345", "/etc/alloy/config.alloy"]

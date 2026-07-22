@@ -1,0 +1,23 @@
+---
+- name: Create Mwakilishi project directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: jthairu
+    group: jthairu
+    mode: '0755'
+  loop:
+    - "{{ mwakilishi_base_dir }}"
+    - "{{ mwakilishi_base_dir }}/db_data"
+
+- name: Deploy Mwakilishi Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ mwakilishi_base_dir }}/docker-compose.yaml"
+    mode: '0644'
+
+- name: Launch Mwakilishi Stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ mwakilishi_base_dir }}"
+    state: present
+    remove_orphans: true

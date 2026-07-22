@@ -1,0 +1,1 @@
+/home/jthairu/ilab-infrastructure/terraform/provider.tf

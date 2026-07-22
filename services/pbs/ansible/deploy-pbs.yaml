@@ -1,0 +1,8 @@
+---
+- name: Deploy Proxmox Backup Server
+  hosts: pbs
+  become: yes
+  vars_files:
+    - /home/jthairu/ilab-infrastructure/ansible/group_vars/all/vars.yml
+  roles:
+    - pbs_setup

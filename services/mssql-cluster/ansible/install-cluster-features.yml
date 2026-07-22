@@ -1,0 +1,15 @@
+---
+- name: Install Failover Clustering Features
+  hosts: sql_nodes
+  gather_facts: yes
+  tasks:
+    - name: Install Failover-Clustering feature
+      win_feature:
+        name: Failover-Clustering
+        include_management_tools: yes
+        state: present
+      register: cluster_feature
+
+    - name: Reboot if Cluster Feature requires it
+      win_reboot:
+      when: cluster_feature.reboot_required

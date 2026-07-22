@@ -1,0 +1,65 @@
+services:
+  pacs-db:
+    image: postgres:16-alpine
+    container_name: pacs-db
+    restart: always
+    environment:
+      - POSTGRES_USER={{ pacs_db_user }}
+      - POSTGRES_PASSWORD={{ pacs_db_password }}
+      - POSTGRES_DB={{ pacs_db_name }}
+    volumes:
+      - {{ app_base_dir }}/postgres:/var/lib/postgresql/data
+    networks:
+      - pacs-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ pacs_db_user }} -d {{ pacs_db_name }}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pacs-backend:
+    image: us-central1-docker.pkg.dev/mwakilishi-1770258957/pacs-repo/pacs-backend:7fe36ee
+    container_name: pacs-backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://{{ pacs_db_user }}:{{ pacs_db_password }}@pacs-db:5432/{{ pacs_db_name }}
+      - ALLOWED_HOSTS=*
+    ports:
+      - "808:8080"
+    depends_on:
+      pacs-db:
+        condition: service_healthy
+    networks:
+      - pacs-network
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pacs-api.rule=Host(`api.mwakilishi.com`)"
+      - "traefik.http.routers.pacs-api.entrypoints=websecure"
+      - "traefik.http.routers.pacs-api.tls.certresolver=route53_aws"
+
+  pacs-frontend:
+    image: us-central1-docker.pkg.dev/mwakilishi-1770258957/pacs-repo/pacs-ui:7fe36ee
+    container_name: pacs-frontend
+    restart: always
+    environment:
+      - BACKEND_URL=http://{{ pacs_api_domain }}
+    ports:
+      - "8090:80"
+    volumes:
+      - {{ app_base_dir }}/frontend/templates:/etc/nginx/templates:ro
+    depends_on:
+      - pacs-backend
+    networks:
+      - pacs-network
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pacs-ui.rule=Host(`mwakilishi.com`, `www.mwakilishi.com`)"
+      - "traefik.http.routers.pacs-ui.entrypoints=websecure"
+      - "traefik.http.routers.pacs-ui.tls.certresolver=route53_aws"
+
+networks:
+  pacs-network:
+  traefik-public:
+    external: true

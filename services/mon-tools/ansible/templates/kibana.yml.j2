@@ -1,0 +1,12 @@
+server.name: kibana
+server.host: "0.0.0.0"
+elasticsearch.hosts: [ "http://elasticsearch:9200" ]
+monitoring.ui.container.elasticsearch.enabled: true
+
+# Security Keys from Vault
+xpack.security.encryptionKey: "{{ kibana_encryption_key }}"
+xpack.encryptedSavedObjects.encryptionKey: "{{ kibana_encryption_key }}"
+xpack.reporting.encryptionKey: "{{ kibana_encryption_key }}"
+
+# Docker Specifics
+xpack.screenshotting.browser.chromium.disableSandbox: true

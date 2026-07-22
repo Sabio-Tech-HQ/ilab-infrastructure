@@ -1,0 +1,65 @@
+---
+# --- PART 1: THE SERVER (STORAGE GATEWAY) ---
+- name: Configure Storage Gateway
+  hosts: storage_gw
+  become: true
+  vars_files:
+    - "../../../ansible/group_vars/all/vars.yml"
+    - "../../../ansible/group_vars/all/vault.yml"
+  tasks:
+    - name: Ensure targetcli is ready
+      ansible.builtin.package:
+        name: targetcli-fb
+        state: present
+
+# --- PART 2: THE CLIENTS (ORACLE NODES) ---
+- name: Configure Oracle Nodes
+  hosts: oracle_nodes
+  become: true
+  vars_files:
+    - "../../../ansible/group_vars/all/vars.yml"
+    - "../../../ansible/group_vars/all/vault.yml"
+  tasks:
+    - name: Locate Oracle Config Script
+      ansible.builtin.find:
+        paths: /opt/oracle
+        patterns: "oracle-free-23ai"
+        recurse: yes
+        file_type: file
+      register: found_script
+
+    - name: Ensure /etc/sysconfig/oracle-free-23ai.conf exists
+      ansible.builtin.copy:
+        dest: /etc/sysconfig/oracle-free-23ai.conf
+        content: |
+          ORACLE_LISTENER_PORT=1521
+          ORACLE_CHARACTERSET=AL32UTF8
+          ORACLE_PWD={{ oracle_password }}
+          SKIP_VALIDATIONS=true
+        mode: '0644'
+
+    - name: Clean up failed DB attempts (Clean Slate)
+      ansible.builtin.shell: |
+        if [ ! -f /etc/oratab ]; then
+          rm -rf /opt/oracle/oradata/FREE/*
+          rm -rf /opt/oracle/product/23ai/dbhomeFree/dbs/initFREE.ora
+        fi
+      failed_when: false
+
+    - name: Run Database Configuration (CDB/PDB Creation)
+      ansible.builtin.shell: |
+        if [ ! -f /etc/oratab ]; then
+          /usr/bin/bash {{ found_script.files[0].path }} configure
+        fi
+      when: found_script.matched > 0
+      async: 3600  # 1 HOUR TIMEOUT
+      poll: 30
+
+    - name: Finalize Environment Variables
+      ansible.builtin.copy:
+        dest: /etc/profile.d/oracle_env.sh
+        content: |
+          export ORACLE_SID=FREE
+          export ORACLE_HOME=/opt/oracle/product/23ai/dbhomeFree
+          export PATH=$ORACLE_HOME/bin:$PATH
+        mode: '0644'

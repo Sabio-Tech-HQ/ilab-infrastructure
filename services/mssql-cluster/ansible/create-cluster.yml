@@ -1,0 +1,56 @@
+---
+- name: Prepare and Create Windows Failover Cluster
+  hosts: sql_nodes
+  gather_facts: yes
+  vars:
+    cluster_name: "MSSQL-CLUSTER"
+    cluster_ip: "10.10.10.70"
+    cluster_nodes:
+      - sql-node-01.ilab.local
+      - sql-node-02.ilab.local
+      - sql-node-03.ilab.local
+
+  tasks:
+    - name: Ensure Domain Admins and Service Account are Local Admins
+      win_group_membership:
+        name: Administrators
+        members:
+          - "ILAB\\Domain Admins"
+          - "ILAB\\sql_svc"
+        state: present
+
+    - name: Disable UAC Remote Restrictions
+      win_regedit:
+        path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System
+        name: LocalAccountTokenFilterPolicy
+        data: 1
+        type: dword
+        state: present
+
+    - name: Create the cluster
+      win_shell: |
+        $nodes = @("sql-node-01.ilab.local", "sql-node-02.ilab.local", "sql-node-03.ilab.local")
+        if (-not (Get-Cluster -Name "{{ cluster_name }}" -ErrorAction SilentlyContinue)) {
+            New-Cluster -Name "{{ cluster_name }}" -Node $nodes -StaticAddress {{ cluster_ip }} -NoStorage -Force
+        }
+      when: inventory_hostname == 'sql-node-01'
+      register: cluster_creation
+      # Removed the complex variable mapping that was failing
+      become: yes
+      become_method: runas
+      become_user: "Administrator@ilab.local"
+
+    - name: Wait for Cluster to stabilize
+      pause:
+        seconds: 20
+      when: inventory_hostname == 'sql-node-01' and cluster_creation.changed
+
+    - name: Verify Cluster Status
+      win_shell: Get-ClusterNode
+      register: cluster_status
+      when: inventory_hostname == 'sql-node-01'
+
+    - name: Display Cluster Status
+      debug:
+        var: cluster_status.stdout_lines
+      when: inventory_hostname == 'sql-node-01'

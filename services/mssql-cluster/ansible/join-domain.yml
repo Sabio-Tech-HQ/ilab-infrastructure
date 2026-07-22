@@ -1,0 +1,26 @@
+---
+- name: Join SQL Nodes to Domain
+  hosts: sql_nodes
+  gather_facts: yes
+  vars:
+    domain_name: "ilab.local"
+    # Using the Domain Admin credentials created in the last step
+    domain_admin_user: "Administrator@{{ domain_name }}"
+    domain_admin_password: "{{ ansible_password }}"
+
+  tasks:
+    - name: Join the ilab.local domain
+      microsoft.ad.membership:
+        dns_domain_name: "{{ domain_name }}"
+        domain_admin_user: "{{ domain_admin_user }}"
+        domain_admin_password: "{{ domain_admin_password }}"
+        state: domain
+        # This will create the computer object in the default container
+        # or you can specify an OU if you have one configured
+      register: domain_join
+
+    - name: Reboot after joining domain
+      win_reboot:
+        msg: "Rebooting to finalize domain membership"
+        pre_reboot_delay: 15
+      when: domain_join.reboot_required
