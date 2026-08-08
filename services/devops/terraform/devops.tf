@@ -1,6 +1,6 @@
 resource "proxmox_virtual_environment_vm" "devops" {
   name      = "devops"
-  node_name = "ilab-node-02"
+  node_name = "ilab-node-01"
   vm_id     = 136
   bios      = "seabios"
 
@@ -50,5 +50,11 @@ resource "proxmox_virtual_environment_vm" "devops" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes = [
+      node_name,
+      network_device[0].mac_address,
+      initialization,
+      startup
+    ]
   }
 }

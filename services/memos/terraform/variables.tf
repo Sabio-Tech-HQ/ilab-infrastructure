@@ -17,9 +17,7 @@ variable "ssh_public_key" {
 }
 
 variable "ssh_public_keys" {
-  description = "List of SSH public keys (defined in tfvars)"
-  type        = string 
-  default     = ""
+  type = list(string)
 }
 
 variable "ssh_password" {

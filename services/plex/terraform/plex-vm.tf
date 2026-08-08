@@ -1,6 +1,6 @@
 resource "proxmox_virtual_environment_vm" "plex" {
   name      = "plex"
-  node_name = "ilab-node-02"
+  node_name = "ilab-node-01"
   vm_id     = 102
   
   # Set to q35 and ovmf as identified in plan
@@ -20,6 +20,7 @@ resource "proxmox_virtual_environment_vm" "plex" {
   network_device {
     bridge   = "vmbr0"
     firewall = true
+    mac_address = "BC:24:11:B5:A7:4E"
   }
 
   disk {
@@ -48,7 +49,8 @@ resource "proxmox_virtual_environment_vm" "plex" {
   # Standard lifecycle for lab stability
   lifecycle {
     ignore_changes = [
-      initialization,
+      node_name,
+      network_device[0].mac_address
     ]
   }
 }

@@ -1,6 +1,6 @@
 resource "proxmox_virtual_environment_vm" "hass" {
   name      = "home-assistant"
-  node_name = "ilab-node-02"
+  node_name = "ilab-node-01"
   vm_id     = 100
   bios      = "ovmf"
   machine   = "q35"
@@ -54,6 +54,10 @@ resource "proxmox_virtual_environment_vm" "hass" {
   }
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = true  
+    ignore_changes = [
+      node_name,
+      network_device[0].mac_address
+    ]
   }
 }

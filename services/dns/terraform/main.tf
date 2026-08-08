@@ -26,6 +26,7 @@ resource "proxmox_virtual_environment_vm" "pihole" {
 
   network_device {
     bridge   = "vmbr0"
+    mac_address = "BC:24:11:18:E5:10"
     firewall = true
   }
 
@@ -62,8 +63,11 @@ resource "proxmox_virtual_environment_vm" "pihole" {
   # This prevents the "Destroy/Create" loop for existing VMs
   lifecycle {
     ignore_changes = [
-      initialization,
+      node_name,
       network_device[0].mac_address,
+      initialization,
+      ipv4_addresses,
+      ipv6_addresses
     ]
   }
 }

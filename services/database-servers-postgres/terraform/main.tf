@@ -10,7 +10,6 @@ resource "proxmox_virtual_environment_vm" "postgres_cluster" {
   vm_id     = each.value.vid
   bios      = "seabios"
 
-
   clone {
     vm_id = 1009
     full  = true
@@ -66,12 +65,14 @@ resource "proxmox_virtual_environment_vm" "postgres_cluster" {
     timeout = "1s"
   }
 
+  # VM Lifecycle Shield goes here
   lifecycle {
     ignore_changes = [
       node_name, 
       network_device[0].mac_address,
       clone,
-      bios
+      bios,
+      initialization
     ]
   }
 }
@@ -144,9 +145,11 @@ resource "proxmox_virtual_environment_container" "postgres_04" {
     ]
   }
 
+  # Container Lifecycle Shield goes here (no unsupported attributes)
   lifecycle {
     ignore_changes = [
-      network_interface[0].mac_address
+      network_interface[0].mac_address,
+      initialization
     ]
   }
 }

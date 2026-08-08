@@ -1,6 +1,6 @@
 resource "proxmox_virtual_environment_vm" "wireguard_vpn" {
   name      = "wireguard"
-  node_name = "ilab-node-02"
+  node_name = "ilab-node-03"
   vm_id     = 110
 
   # Match the existing BIOS hardware
@@ -23,7 +23,7 @@ resource "proxmox_virtual_environment_vm" "wireguard_vpn" {
 
   network_device {
     bridge   = "vmbr0"
-    firewall = true     
+    firewall = false     
     model    = "virtio"
   }
 
@@ -43,15 +43,5 @@ resource "proxmox_virtual_environment_vm" "wireguard_vpn" {
     file_format       = "raw"
     pre_enrolled_keys = true  
     type              = "4m"    
-  }
-
-  initialization {
-    datastore_id = "vmstore"
-    ip_config {
-      ipv4 {
-        address = "10.10.10.20/24"
-        gateway = "10.10.10.1"
-      }
-    }
   }
 }

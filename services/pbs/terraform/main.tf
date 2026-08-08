@@ -20,7 +20,7 @@ resource "proxmox_virtual_environment_vm" "pbs" {
   }
 
   disk {
-    datastore_id = "local-lvm"
+    datastore_id = "vmstore"
     file_format  = "raw"
     interface    = "scsi0"
     size         = 32
@@ -30,7 +30,7 @@ resource "proxmox_virtual_environment_vm" "pbs" {
 
   cdrom {
     enabled   = true
-    file_id   = "local:iso/proxmox-backup-server_4.0-1.iso"
+    file_id   = "none"
     interface = "ide2"
   }
 

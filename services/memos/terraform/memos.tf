@@ -1,6 +1,6 @@
 resource "proxmox_virtual_environment_container" "memos_notes" {
   description  = "Memos LXC"
-  node_name    = "ilab-node-03"
+  node_name    = "ilab-node-01"
   vm_id        = 350
   unprivileged = true
 
@@ -69,6 +69,15 @@ resource "proxmox_virtual_environment_container" "memos_notes" {
       "chown -R jthairu:jthairu /home/jthairu/.ssh",
       "chmod 700 /home/jthairu/.ssh",
       "chmod 600 /home/jthairu/.ssh/authorized_keys"
+    ]
+  }
+
+ lifecycle {
+    ignore_changes = [
+      initialization,
+      operating_system,
+      network_interface[0].mac_address,
+      unprivileged,
     ]
   }
 }

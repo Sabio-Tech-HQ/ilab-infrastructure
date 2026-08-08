@@ -31,12 +31,13 @@ resource "proxmox_virtual_environment_vm" "mariadb_cluster" {
     enabled = false
   }
 
-  # Prevents Proxmox provider from querying the QEMU agent for network data
+  # HA Shield for MariaDB
   lifecycle {
     ignore_changes = [
-      network_interface_names,
-      ipv4_addresses,
-      ipv6_addresses,
+      node_name,
+      initialization,
+      network_device[0].mac_address,
+      clone,
     ]
   }
 
@@ -98,21 +99,11 @@ resource "proxmox_virtual_environment_vm" "maxscale_cluster" {
   }
 
   memory {
-    # MaxScale is just routing traffic, it doesn't need as much RAM as the DBs
     dedicated = 2048 
   }
 
   agent {
     enabled = false
-  }
-
-  # Prevents Proxmox provider from querying the QEMU agent for network data
-  lifecycle {
-    ignore_changes = [
-      network_interface_names,
-      ipv4_addresses,
-      ipv6_addresses,
-    ]
   }
 
   network_device {
@@ -126,7 +117,7 @@ resource "proxmox_virtual_environment_vm" "maxscale_cluster" {
   disk {
     datastore_id = "vmstore"
     interface    = "scsi0"
-    size         = 20 # 20GB is plenty for the proxy OS
+    size         = 20 
     file_format  = "raw"
     iothread     = true
     discard      = "on"
@@ -144,5 +135,14 @@ resource "proxmox_virtual_environment_vm" "maxscale_cluster" {
       password = var.ssh_password
       keys     = var.ssh_public_keys
     }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      node_name,
+      initialization,
+      network_device[0].mac_address,
+      clone
+    ]
   }
 }

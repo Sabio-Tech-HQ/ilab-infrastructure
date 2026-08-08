@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-loadbalancer
+  namespace: default
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 10.10.10.240  # Forces MetalLB to grab this exact IP
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres  # Or your CNPG cluster selector labels

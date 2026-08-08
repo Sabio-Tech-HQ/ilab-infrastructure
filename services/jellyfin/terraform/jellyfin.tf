@@ -1,6 +1,6 @@
 resource "proxmox_virtual_environment_vm" "jellyfin" {
   name      = "jellyfin"
-  node_name = "ilab-node-03"
+  node_name = "ilab-node-02"
   vm_id     = 104
   
   # Set to q35 and ovmf as identified in plan
@@ -20,6 +20,7 @@ resource "proxmox_virtual_environment_vm" "jellyfin" {
 
   network_device {
     bridge   = "vmbr0"
+    mac_address = "BC:24:11:A3:5C:20"
     firewall = false
   }
 

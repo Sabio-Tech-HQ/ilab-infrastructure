@@ -52,12 +52,13 @@ resource "proxmox_virtual_environment_vm" "traefik_vms" {
   }
 
   lifecycle {
-    # This prevents the 'Destroy/Recreate' behavior you just saw
     ignore_changes = [
-      disk,
-      network_device,
+      node_name,
+      network_device[0].mac_address,
+      initialization,
       efi_disk,
-      initialization[0].user_account
+      ipv4_addresses,
+      ipv6_addresses
     ]
   }
 }

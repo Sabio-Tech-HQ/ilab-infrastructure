@@ -30,8 +30,12 @@ resource "proxmox_virtual_environment_vm" "haproxy_cluster" {
     }
   }
 
-  # REMOVE ignore_changes so Terraform can actually fix the identity
-  # lifecycle {
-  #   ignore_changes = [initialization]
-  # }
+  lifecycle {
+    ignore_changes = [
+      node_name,
+      initialization,
+      network_device[0].mac_address,
+      clone
+    ]
+  }
 }
