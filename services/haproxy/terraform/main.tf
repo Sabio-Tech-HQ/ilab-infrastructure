@@ -22,10 +22,7 @@ resource "proxmox_virtual_environment_vm" "haproxy_cluster" {
 
     user_account {
       username = var.ssh_user
-      keys     = [
-        var.ssh_public_key,
-        file("/home/jthairu/.ssh/id_ed25519.pub")
-      ]
+      keys     = var.ssh_public_keys
       password = var.ssh_password  
     }
   }
@@ -33,8 +30,8 @@ resource "proxmox_virtual_environment_vm" "haproxy_cluster" {
   lifecycle {
     ignore_changes = [
       node_name,
-      initialization,
       network_device[0].mac_address,
+      initialization[0].user_account,
       clone
     ]
   }

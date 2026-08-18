@@ -1,0 +1,181 @@
+- name: Provision DevOps Management Node
+  hosts: devops
+  become: yes
+
+  tasks:
+    - name: Ensure prerequisites for adding repositories are present
+      apt:
+        name:
+          - curl
+          - gnupg
+          - ca-certificates
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    # ==========================================
+    # 1. DOCKER OFFICIAL REPOSITORY
+    # ==========================================
+    - name: Create directory for apt keyrings
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Docker GPG key
+      shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch={{ 'amd64' }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+
+    # ==========================================
+    # 2. PHP 8.4 (ONDREJ SURY PPA)
+    # ==========================================
+    - name: Add PHP PPA (Ondřej Surý)
+      apt_repository:
+        repo: "ppa:ondrej/php"
+        state: present
+
+    # ==========================================
+    # 3. POSTGRESQL 17 OFFICIAL REPOSITORY
+    # ==========================================
+    - name: Add PostgreSQL official GPG key
+      shell: |
+        curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/keyrings/postgresql.gpg
+      args:
+        creates: /etc/apt/keyrings/postgresql.gpg
+
+    - name: Add PostgreSQL 17 repository
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+        state: present
+        filename: pgdg
+
+    # ==========================================
+    # 4. TAILSCALE REPOSITORY
+    # ==========================================
+    - name: Add Tailscale GPG key
+      shell: |
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_distribution_release }}.noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+      args:
+        creates: /usr/share/keyrings/tailscale-archive-keyring.gpg
+
+    - name: Add Tailscale repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu {{ ansible_distribution_release }} main"
+        state: present
+        filename: tailscale
+
+    # ==========================================
+    # 5. RUN APT UPDATE & INSTALL ALL PACKAGES
+    # ==========================================
+    - name: Ensure core management and development tools are installed
+      apt:
+        name:
+          - ansible
+          - composer
+          - curl
+          - git
+          - gnupg
+          - jq
+          - lsb-release
+          - net-tools
+          - nodejs
+          - npm
+          - openssh-server
+          - python3-pymysql
+          - qemu-guest-agent
+          - qemu-user-static
+          - sshpass
+          - tailscale
+          - unzip
+          - wget
+          - mysql-client
+          - postgresql-client-17
+          - php-pgsql
+          - php-redis
+          - php8.4-cli
+          - php8.4-common
+          - php8.4-curl
+          - php8.4-mbstring
+          - php8.4-pgsql
+          - php8.4-xml
+          - php8.4-zip
+          - docker-ce
+          - docker-ce-cli
+          - docker-buildx-plugin
+          - docker-compose-plugin
+          - containerd.io
+        state: present
+        update_cache: yes
+
+    # ==========================================
+    # 6. GIT SETUP & CONFIGURATION
+    # ==========================================
+    - name: Configure global Git user name
+      community.general.git_config:
+        name: user.name
+        scope: global
+        value: "J. Thairu"
+
+    - name: Configure global Git user email from Bitwarden
+      community.general.git_config:
+        name: user.email
+        scope: global
+        value: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='email') }}"
+      when: lookup('community.general.bitwarden', 'devops-ansible', field='email', default='') != ''
+
+    - name: Ensure .ssh directory exists
+      file:
+        path: "/home/jthairu/.ssh"
+        state: directory
+        owner: jthairu
+        group: jthairu
+        mode: '0700'
+
+    - name: Deploy Git/GitHub SSH private key from Bitwarden
+      copy:
+        content: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='private_key') }}"
+        dest: "/home/jthairu/.ssh/id_ed25519"
+        owner: jthairu
+        group: jthairu
+        mode: '0600'
+      when: lookup('community.general.bitwarden', 'devops-ansible', field='private_key', default='') != ''
+
+    # ==========================================
+    # 7. CLONE GIT REPOSITORIES
+    # ==========================================
+    - name: Ensure parent directories exist for repositories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: jthairu
+        group: jthairu
+        mode: '0755'
+      loop:
+        - '/home/jthairu/mwakilishi'
+
+    - name: Clone all development repositories from Bitwarden records
+      ansible.builtin.git:
+        repo: "{{ item.repo }}"
+        dest: "{{ item.dest }}"
+        version: "{{ item.version | default('main') }}"
+        accept_hostkey: yes
+        update: no
+      become_user: jthairu
+      loop:
+        - repo: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='repo_ilab') | first }}"
+          dest: '/home/jthairu/ilab-infrastructure'
+        - repo: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='repo_mwakilishi') | first }}"
+          dest: '/home/jthairu/mwakilishi/app'
+        - repo: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='repo_mdko') | first }}"
+          dest: '/home/jthairu/mdko-portal'
+        - repo: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='repo_nidate') | first }}"
+          dest: '/home/jthairu/nidate'
+      when: lookup('community.general.bitwarden', 'devops-ansible', field='repo_ilab', default='') != ''

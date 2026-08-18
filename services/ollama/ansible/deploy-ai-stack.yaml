@@ -1,0 +1,126 @@
+- name: Deploy AI Stack (OpenRouter & Open WebUI) via Docker
+  hosts: ollama
+  become: yes
+
+  vars:
+    ai_base_dir: "/opt/ai-stack"
+
+  vars_files:
+    - /home/jthairu/ilab-infrastructure/group_vars/vault.yml
+
+  tasks:
+    - name: Ensure dependency prerequisites are installed
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: yes
+
+    - name: Create directory for Docker official GPG key
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Docker official GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0444'
+
+    - name: Add Docker repository to Apt sources
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+
+    - name: Ensure Docker engine and compose plugin are installed
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is started and enabled
+      systemd:
+        name: docker
+        state: restarted
+        enabled: yes
+
+    - name: Wait for Docker socket to become available
+      wait_for:
+        path: /var/run/docker.sock
+        timeout: 10
+
+    - name: Add deployment user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Create base directory for AI stack
+      file:
+        path: "{{ ai_base_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Deploy Docker Compose configuration file with Free Cloud API integrations
+      copy:
+        dest: "{{ ai_base_dir }}/docker-compose.yml"
+        content: |
+          services:
+            ollama:
+              image: ollama/ollama:latest
+              container_name: ollama
+              restart: unless-stopped
+              ports:
+                - "11434:11434"
+              volumes:
+                - ollama_data:/root/.ollama
+              environment:
+                - OLLAMA_HOST=0.0.0.0
+                - OLLAMA_NUM_THREADS=6
+
+            open-webui:
+              image: ghcr.io/open-webui/open-webui:main
+              container_name: open-webui
+              restart: unless-stopped
+              ports:
+                - "3000:8080"
+              environment:
+                - OLLAMA_BASE_URL=http://ollama:11434
+                # Configure primary OpenAI-compatible provider (Groq) using your vault keys
+                - OPENAI_API_BASE_URL=https://api.groq.com/openai/v1
+                - OPENAI_API_KEY={{ GROQ_API_KEY }}
+                # Additional environment hooks/keys for reference inside container
+                - GROQ_API_KEY={{ GROQ_API_KEY }}
+                - GROQ_API_KEY2={{ GROQ_API_KEY2 | default('') }}
+                - GEMINI_API_KEY={{ GEMINI_API_KEY | default('') }}
+                - OPENROUTER_API_KEY={{ OPENROUTER_API_KEY }}
+                
+                # --- THIS LOCKS IN YOUR DATABASE ENCRYPTION ---
+                - WEBUI_SECRET_KEY=ilab_secure_static_key_do_not_change_2026
+              volumes:
+                - open_webui_data:/app/backend/data
+              depends_on:
+                - ollama
+
+          volumes:
+            ollama_data:
+            open_webui_data:
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Up and run AI stack containers via Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ ai_base_dir }}"
+        state: restarted
+      become: yes

@@ -34,6 +34,18 @@ bootstrap:
     - encoding: UTF8
     - locale: en_US.UTF-8
 
+  # ADDED: Patroni native bootstrap users and databases
+  users:
+    vaultwarden:
+      password: "{{ lookup('env', 'PATRONI_VAULTWARDEN_PASSWORD') }}"
+      options:
+        createdb: false
+        login: true
+
+  databases:
+    vaultwarden:
+      owner: vaultwarden
+
 postgresql:
   listen: 0.0.0.0:5432
   connect_address: {{ ansible_default_ipv4.address }}:5432
@@ -43,7 +55,7 @@ postgresql:
   authentication:
     replication:
       username: replicator
-      password: {{ replication_password }}
+      password: "{{ lookup('env', 'PATRONI_REPLICATOR_PASSWORD') }}"
     superuser:
       username: postgres
-      password: {{ postgres_password }}
+      password: "{{ lookup('env', 'PATRONI_SUPERUSER_PASSWORD') }}"

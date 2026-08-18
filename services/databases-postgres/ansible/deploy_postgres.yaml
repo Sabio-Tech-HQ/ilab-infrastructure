@@ -1,0 +1,4 @@
+---
+- import_playbook: setup_etcd.yaml
+- import_playbook: setup_cluster.yaml
+- import_playbook: manage_proxies.yaml

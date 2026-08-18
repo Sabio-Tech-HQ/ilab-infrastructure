@@ -1,0 +1,19 @@
+---
+- name: Ensure Pi-hole configuration directory exists
+  ansible.builtin.file:
+    path: /etc/pihole
+    state: directory
+    owner: pihole
+    group: pihole
+    mode: '0755'
+  become: true
+
+- name: Deploy Pi-hole v6 configuration file
+  ansible.builtin.template:
+    src: pihole.toml.j2
+    dest: /etc/pihole/pihole.toml
+    owner: pihole
+    group: pihole
+    mode: '0640'
+  become: true
+  notify: Restart Pi-hole FTL

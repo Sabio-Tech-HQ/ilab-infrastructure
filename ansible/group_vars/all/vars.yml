@@ -41,6 +41,7 @@ music_path: "{{ nas_root }}/music"
 video_path: "{{ nas_root }}/video"
 
 postgres_host: 10.10.10.200
+haproxy_vip: 10.10.10.200
 
 
 
@@ -107,3 +108,6 @@ pbs_mount_point: "/mnt/datastore"
 
 memos_base_dir: "/opt/memos"
 memos_data_dir: "/var/opt/memos"
+
+vault_domain: "https://vault.mwakilishi.com"
+

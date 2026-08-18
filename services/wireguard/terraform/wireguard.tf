@@ -1,6 +1,6 @@
 resource "proxmox_virtual_environment_vm" "wireguard_vpn" {
   name      = "wireguard"
-  node_name = "ilab-node-03"
+  node_name = "ilab-node-01"
   vm_id     = 110
 
   # Match the existing BIOS hardware

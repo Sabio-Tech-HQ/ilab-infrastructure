@@ -3,6 +3,12 @@
   hosts: media  # Target host group defined in inventory.ini
   become: true
 
+  vars:
+    jtnas_ip: "10.10.10.95"  
+    jtnas_username: "{{ lookup('community.general.bitwarden', 'media-ansible', field='jtnas_username') }}"
+    jtnas_password: "{{ lookup('community.general.bitwarden', 'media-ansible', field='jtnas_password') }}"
+
+
   roles:
     - nas_mounts  # Shared role for CIFS mounts
 

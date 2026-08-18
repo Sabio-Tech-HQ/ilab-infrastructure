@@ -8,15 +8,9 @@ variable "db_password" {
   sensitive   = true
 }
 
-variable "media_dbs_password" {
-  type        = string
-  sensitive   = true
-}
 
 
-
-variable "app_db_passwords" {
-  type        = map(string)
-  description = "Map of passwords for pacs, airflow, vitals"
-  sensitive   = true
+variable "vaultwarden_db_password" {
+  type      = string
+  sensitive = true
 }

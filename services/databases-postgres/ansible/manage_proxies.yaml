@@ -32,7 +32,6 @@
               server postgres-01 10.10.10.201:5432 check port 8008
               server postgres-02 10.10.10.202:5432 check port 8008
               server postgres-03 10.10.10.203:5432 check port 8008
-              server postgres-04 10.10.10.206:5432 check port 8008
 
           # --- READ LISTENER (Replicas Only) ---
           listen postgres_read
@@ -45,7 +44,6 @@
               server postgres-01 10.10.10.201:5432 check port 8008
               server postgres-02 10.10.10.202:5432 check port 8008
               server postgres-03 10.10.10.203:5432 check port 8008
-              server postgres-04 10.10.10.206:5432 check port 8008
 
           listen stats
               bind *:8080

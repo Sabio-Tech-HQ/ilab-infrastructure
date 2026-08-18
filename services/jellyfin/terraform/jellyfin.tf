@@ -47,11 +47,13 @@ resource "proxmox_virtual_environment_vm" "jellyfin" {
     type    = "virtio"
   }
 
+ 
 
   initialization {
     user_account {
       username = var.ssh_user
-      keys     = split(", ", var.ssh_public_key)
+      keys     = concat([var.ssh_public_key], var.ssh_public_keys)
+      password = var.ssh_password
     }
   }
 

@@ -8,10 +8,10 @@ terraform {
 }
 
 provider "postgresql" {
-  host            = var.db_vip
+  host            = "10.10.10.200"
   port            = 5432
-  username        = "terraform" 
+  database        = "postgres"
+  username        = "postgres"
   password        = var.db_password
   sslmode         = "disable"
-  connect_timeout = 15
 }

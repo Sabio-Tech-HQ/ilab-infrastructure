@@ -22,18 +22,11 @@ variable "ssh_user" {
   type    =   string   
 }
 
-variable "pacs_password" {
-  description = "Password for the PACS MySQL user"
-  type        = string
-  sensitive   = true
-}
 
-variable "mysql_root_password" {
-  description = "Password for mysql root"
-  type        = string
-  sensitive   = true
-}
 
+variable "gateway" {
+  type    =   string   
+}
 
 
 variable "proxmox_api_url" {

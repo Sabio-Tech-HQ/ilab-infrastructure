@@ -66,8 +66,6 @@ resource "proxmox_virtual_environment_vm" "pihole" {
       node_name,
       network_device[0].mac_address,
       initialization,
-      ipv4_addresses,
-      ipv6_addresses
     ]
   }
 }

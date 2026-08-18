@@ -1,11 +1,16 @@
----
 - name: Deploy Complete Monitoring Stack to mon-tools
   hosts: mon-tools
   become: yes
 
-  vars_files:
-    - "../../../ansible/group_vars/all/vars.yml"
-    - "../../../ansible/group_vars/all/vault.yml"
+  #vars_files:
+  #  - "../../../ansible/group_vars/all/vars.yml"
+  #  - "../../../ansible/group_vars/all/vault.yml"
+
+  vars:
+    kibana_encryption_key: "{{ lookup('community.general.bitwarden', 'montools-ansible', field='kibana_encryption_key') }}"
+    grafana_admin_password: "{{ lookup('community.general.bitwarden', 'montools-ansible', field='grafana_admin_password') }}"
+    smtp_user: "{{ lookup('community.general.bitwarden', 'montools-ansible', field='smtp_user') }}"
+    smtp_pass: "{{ lookup('community.general.bitwarden', 'montools-ansible', field='smtp_pass') }}"
 
   tasks:
     # 0. SYSTEM PREP: Install tools and fix kernel limits
@@ -16,8 +21,34 @@
           - curl
           - net-tools
           - vim
+          - nano
         state: present
         update_cache: yes
+
+    - name: Install Docker prerequisites
+      apt:
+        name:
+          - ca-certificates
+          - gnupg
+        state: present
+
+    - name: Ensure Docker is installed
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is started and enabled
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add user to docker group
+      user:
+        name: "jthairu"
+        groups: docker
+        append: yes
 
     - name: Set vm.max_map_count for Elasticsearch
       ansible.posix.sysctl:
@@ -113,10 +144,10 @@
         volumes: ["{{ montools_base_dir }}/grafana:/var/lib/grafana"]
         user: "1000:1000"
         env:
-          GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
+          GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password | string }}"
           GF_SMTP_ENABLED: "true"
-          GF_SMTP_USER: "{{ smtp_user }}"
-          GF_SMTP_PASSWORD: "{{ smtp_pass }}"
+          GF_SMTP_USER: "{{ smtp_user | string }}"
+          GF_SMTP_PASSWORD: "{{ smtp_pass | string }}"
 
     - name: Start Kibana
       community.docker.docker_container:

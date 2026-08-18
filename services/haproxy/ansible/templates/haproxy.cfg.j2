@@ -1,28 +1,62 @@
-global_defs {
-    enable_script_security
-    script_user root
-}
+global
+    log /dev/log local0
+    stats socket /run/haproxy.sock mode 660 level admin
+    user haproxy
+    group haproxy
 
-vrrp_script check_haproxy {
-    script "/usr/bin/killall -0 haproxy"
-    interval 2
-    weight 2
-}
+defaults
+    log     global
+    option  dontlognull
+    timeout connect 5s
+    timeout client  50s
+    timeout server  50s
 
-vrrp_instance VI_1 {
-    state {{ 'MASTER' if inventory_hostname == 'haproxy-01' else 'BACKUP' }}
-    interface eth0
-    virtual_router_id 51
-    priority {{ 101 if inventory_hostname == 'haproxy-01' else 100 }}
-    advert_int 1
-    authentication {
-        auth_type PASS
-        auth_pass 42
-    }
-    virtual_ipaddress {
-        10.10.10.200/24
-    }
-    track_script {
-        check_haproxy
-    }
-}
+listen postgres_cluster
+    bind *:5432
+    mode tcp
+    balance roundrobin
+    option httpchk GET /primary
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2
+    server postgres-01 10.10.10.201:5432 check port 8008
+    server postgres-02 10.10.10.202:5432 check port 8008
+    server postgres-03 10.10.10.203:5432 check port 8008
+    server postgres-04 10.10.10.206:5432 check port 8008
+
+# --- READ LISTENER (Replicas Only) ---
+listen postgres_read
+    bind *:5433
+    mode tcp
+    balance roundrobin
+    option httpchk GET /replica
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2
+    server postgres-01 10.10.10.201:5432 check port 8008
+    server postgres-02 10.10.10.202:5432 check port 8008
+    server postgres-03 10.10.10.203:5432 check port 8008
+    server postgres-04 10.10.10.206:5432 check port 8008
+
+listen stats
+    bind *:8404
+    mode http
+    stats enable
+    stats uri /
+
+frontend vaultwarden_front
+    bind *:80
+    mode http
+    option forwardfor
+    http-request set-header X-Forwarded-Proto https if { ssl_fc }
+    http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
+    default_backend vaultwarden_backend
+
+backend vaultwarden_backend
+    mode http
+    balance roundrobin
+    option httpchk GET /
+    http-check expect status 200
+    server vaultwarden-01 10.10.10.207:80 check
+    server vaultwarden-02 10.10.10.208:80 check
+    server vaultwarden-03 10.10.10.209:80 check
+
+

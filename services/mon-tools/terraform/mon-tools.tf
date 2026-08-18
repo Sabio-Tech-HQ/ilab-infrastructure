@@ -1,28 +1,32 @@
 resource "proxmox_virtual_environment_vm" "mon-tools" {
   name      = "mon-tools"
   node_name = "ilab-node-03"
-  vm_id     = 106
+  vm_id     = 127
   bios      = "ovmf"
 
   on_boot         = true
   keyboard_layout = "en-us"
+  machine         = "q35"
+  scsi_hardware   = "virtio-scsi-single" 
 
-  machine        = "q35"
-
-  scsi_hardware  = "virtio-scsi-single" 
+  clone {
+    vm_id        = 1009
+    full         = true 
+    datastore_id = "vmstore"
+  }
 
   cpu {
-          cores     = 4 
-          type      = "x86-64-v2-AES"
+    cores = 4 
+    type  = "x86-64-v2-AES"
   }
 
   memory {
-           dedicated   =   8192 
+    dedicated = 8192 
   }
 
   disk {
     datastore_id = "vmstore"
-    file_format  = "raw"
+    file_format   = "raw"
     interface    = "scsi0"
     size         = 115
     iothread     = true
@@ -31,32 +35,47 @@ resource "proxmox_virtual_environment_vm" "mon-tools" {
   }
   
   efi_disk { 
-           datastore_id      = "vmstore"
-           file_format       = "raw" 
-           pre_enrolled_keys = true 
-           type              = "4m" 
-        }
+    datastore_id      = "vmstore"
+    file_format       = "raw" 
+    pre_enrolled_keys = true 
+    type              = "4m" 
+  }
   
-   agent {
-           enabled = true 
-           type    = "virtio"
-        }
+  agent {
+    enabled = true 
+    type    = "virtio"
+  }
 
   operating_system {
-           type = "l26" 
-        }
+    type = "l26" 
+  }
 
-   network_device {
-           bridge       = "vmbr0"
-           disconnected = false
-           enabled      = true
-           firewall     = true 
-           mac_address  = "BC:24:11:0D:17:40" 
-   }
+  initialization {
+    datastore_id = "vmstore"
 
-   description = "Managed by Terraform."
+    user_account {
+      username = var.ssh_user
+      password = var.ssh_password
+      keys     = var.ssh_public_keys
+    }
 
-   timeout_create = 1800
-   timeout_clone  = 1800
+    ip_config {
+      ipv4 {
+        address = var.ip_address
+        gateway = var.gateway
+      }
+    }
+  }
 
+  network_device {
+    bridge       = "vmbr0"
+    disconnected = false
+    enabled      = true
+    firewall     = true 
+    mac_address  = "BC:24:11:0D:17:40" 
+  }
+
+  description    = "Managed by Terraform."
+  timeout_create = 1800
+  timeout_clone  = 1800
 }

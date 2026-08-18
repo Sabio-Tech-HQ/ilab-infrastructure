@@ -53,12 +53,8 @@ services:
       - TZ={{ timezone }}
       - PUID={{ admin_uid }}
       - PGID={{ admin_gid }}
-      - LIDARR__POSTGRES__HOST={{ postgres_host }}
-      #- LIDARR__POSTGRES__PORT=5432
-      #- LIDARR__POSTGRES__USER=lidarr
-      #- LIDARR__POSTGRES__PASSWORD={{ media_db_pass }}
-      #- LIDARR__POSTGRES__MAINDB=lidarr_main
-      #- LIDARR__POSTGRES__LOGDB=lidarr_log
+     
+    
     ports:
       - 8686:8686
     volumes:
@@ -78,12 +74,7 @@ services:
       - TZ={{ timezone }}
       - PUID={{ admin_uid }}
       - PGID={{ admin_gid }}
-      #- RADARR__POSTGRES__HOST={{ postgres_host }}
-      #- RADARR__POSTGRES__PORT=5432
-      #- RADARR__POSTGRES__USER=radarr
-      #- RADARR__POSTGRES__PASSWORD={{ media_db_pass }}
-      #- RADARR__POSTGRES__MAINDB=radarr_main
-      #- RADARR__POSTGRES__LOGDB=radarr_log
+     
     ports:
       - 7878:7878
     volumes:
@@ -103,12 +94,7 @@ services:
       - TZ={{ timezone }}
       - PUID={{ admin_uid }}
       - PGID={{ admin_gid }}
-      #- SONARR__POSTGRES__HOST={{ postgres_host }}
-      #- SONARR__POSTGRES__PORT=5432
-      #- SONARR__POSTGRES__USER=sonarr
-      #- SONARR__POSTGRES__PASSWORD={{ media_db_pass }}
-      #- SONARR__POSTGRES__MAINDB=sonarr_main
-      #- SONARR__POSTGRES__LOGDB=sonarr_log
+     
     ports:
       - 8989:8989
     volumes:

@@ -286,8 +286,31 @@ http:
       service: maxscale-service
       tls:
         certResolver: route53_aws
+    ai:
+      rule: "Host(`ai.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: ai-service
+      tls:
+        certResolver: route53_aws
+    ittools:
+      rule: "Host(`ittools.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: ittools-service
+      tls:
+        certResolver: route53_aws
 
-  services:
+  services: 
+    
+    ittools-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.119:8080/"  
+    ai-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.99:3000/"
 
     maxscale-service:
       loadBalancer:
@@ -436,7 +459,7 @@ http:
     vault-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.45:8080"
+          - url: "http://10.10.10.200:80"
 
     ilab1-service:
       loadBalancer:

@@ -1,0 +1,5 @@
+---
+- hosts: pihole-01
+  become: true
+  roles:
+    - pihole

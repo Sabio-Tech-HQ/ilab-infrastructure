@@ -1,10 +1,8 @@
----
 - name: Configure Keepalived for Traefik VIP
   hosts: traefik_nodes
   become: true
   vars_files:
     - "../../../ansible/group_vars/all/vars.yml"
-    - "../../../ansible/group_vars/all/vault.yml"
   tasks:
     - name: Install keepalived
       ansible.builtin.apt:
@@ -48,7 +46,6 @@
   become: true
   vars_files:  
     - "../../../ansible/group_vars/all/vars.yml"
-    - "../../../ansible/group_vars/all/vault.yml"
   vars:
     traefik_dir: "/etc/traefik"
     ansible_user_id: "jthairu"
@@ -56,7 +53,7 @@
   tasks:
     - name: Ensure user is in the docker group
       ansible.builtin.user:
-        name: "{{ ansible_user_id }}"
+        name: "{{ ansible_user }}"
         groups: docker
         append: yes
 
@@ -67,8 +64,8 @@
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
-        owner: "{{ ansible_user_id }}"
-        group: "{{ ansible_user_id }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
         mode: '0755'
       loop:
         - "{{ traefik_dir }}"
@@ -87,18 +84,25 @@
         src: templates/traefik.yml.j2
         dest: "{{ traefik_dir }}/traefik.yml"
         mode: '0644'
+      vars:
+        traefik_acme_email: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='traefik_acme_email') }}"
 
     - name: Deploy Traefik Dynamic Config
       ansible.builtin.template:
         src: templates/dynamic_conf.yml.j2
         dest: "{{ traefik_dir }}/dynamic/dynamic_conf.yml"
         mode: '0644'
+      vars:
+        traefik_auth_password: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='traefik_auth_password') }}"
 
     - name: Deploy Docker Compose for Traefik
       ansible.builtin.template:
         src: templates/docker-compose.yml.j2
         dest: "{{ traefik_dir }}/docker-compose.yml"
         mode: '0644'
+      vars:
+        aws_access_key: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='aws_access_key') }}"
+        aws_secret_key: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='aws_secret_key') }}"
 
     - name: Start Traefik containers
       community.docker.docker_compose_v2:

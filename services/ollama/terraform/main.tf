@@ -11,7 +11,7 @@ resource "proxmox_virtual_environment_container" "ollama_ai" {
 
   disk {
     datastore_id = "vmstore"
-    size         = 40 # 40GB for Ubuntu + Qwen model weights (~9GB)
+    size         = 60 # 40GB for Ubuntu + Qwen model weights (~9GB)
   }
 
   cpu {

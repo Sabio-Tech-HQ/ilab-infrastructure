@@ -1,0 +1,95 @@
+flowchart TD
+
+  subgraph DATABASE-SERVERS-POSTGRES ["DATABASE-SERVERS-POSTGRES"]
+    postgres_04[postgres_04]
+    postgres_cluster[postgres_cluster]
+  end
+
+  subgraph DATABASES-POSTGRES ["DATABASES-POSTGRES"]
+  end
+
+  subgraph DEVOPS ["DEVOPS"]
+    devops[devops]
+  end
+
+  subgraph DNS ["DNS"]
+    pihole[pihole]
+  end
+
+  subgraph HAPROXY ["HAPROXY"]
+    haproxy_cluster[haproxy_cluster]
+  end
+
+  subgraph HOMEASSISTANT ["HOMEASSISTANT"]
+    hass[hass]
+  end
+
+  subgraph IT-TOOLS ["IT-TOOLS"]
+    ittools[ittools]
+  end
+
+  subgraph JELLYFIN ["JELLYFIN"]
+    jellyfin[jellyfin]
+  end
+
+  subgraph KAFKA ["KAFKA"]
+    kafka_cluster[kafka_cluster]
+  end
+
+  subgraph MCP ["MCP"]
+    mcp_gateway[mcp_gateway]
+  end
+
+  subgraph MEDIA ["MEDIA"]
+    media[media]
+  end
+
+  subgraph MEMOS ["MEMOS"]
+    memos_notes[memos_notes]
+  end
+
+  subgraph MON-TOOLS ["MON-TOOLS"]
+    mon[mon]
+  end
+
+  subgraph MSSQL-CLUSTER ["MSSQL-CLUSTER"]
+    dc_server[dc_server]
+    sql_nodes[sql_nodes]
+  end
+
+  subgraph OLLAMA ["OLLAMA"]
+    ollama_ai[ollama_ai]
+  end
+
+  subgraph ORACLE-CLUSTER ["ORACLE-CLUSTER"]
+    oracle_nodes[oracle_nodes]
+    storage_node[storage_node]
+  end
+
+  subgraph PBS ["PBS"]
+    pbs[pbs]
+  end
+
+  subgraph PLEX ["PLEX"]
+    plex[plex]
+  end
+
+  subgraph TALOS ["TALOS"]
+    talos_nodes[talos_nodes]
+  end
+
+  subgraph TRAEFIK ["TRAEFIK"]
+    traefik_vms[traefik_vms]
+  end
+
+  subgraph UBUNTU-TEMPLATE ["UBUNTU-TEMPLATE"]
+    ubuntu_template[ubuntu_template]
+  end
+
+  subgraph WEB-SERVER ["WEB-SERVER"]
+    web[web]
+  end
+
+  subgraph WIREGUARD ["WIREGUARD"]
+    wireguard_vpn[wireguard_vpn]
+  end

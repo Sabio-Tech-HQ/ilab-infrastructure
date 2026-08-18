@@ -5,8 +5,8 @@
   vars:
     peer_name: "phone-jthairu"
     peer_ip: "10.20.10.2/32"
-    # Replace with your actual Public IP or DDNS
-    server_public_endpoint: "YOUR_PUBLIC_IP:51820"
+    # Pull from inventory or group_vars, or set here as standard config
+    server_public_endpoint: "{{ wireguard_public_endpoint | default('69.255.76.106:51820') }}"
     server_wg_ip: "10.20.10.1"
 
   tasks:

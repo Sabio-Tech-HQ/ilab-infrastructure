@@ -2,12 +2,15 @@
 - name: Deploy Plex
   hosts: plex
   become: true
-  vars_files:
-    - "../../../ansible/group_vars/all/vars.yml"
-    - "../../../ansible/group_vars/all/vault.yml"
+
+  vars:
+    jtnas_ip: "10.10.10.95"  
+    jtnas_username: "{{ lookup('community.general.bitwarden', 'plex-ansible', field='jtnas_username') }}"
+    jtnas_password: "{{ lookup('community.general.bitwarden', 'plex-ansible', field='jtnas_password') }}"
+    plex_claim_token: "{{ lookup('community.general.bitwarden', 'plex-ansible', field='plex_claim_token') }}"
 
   roles:
-    - nas_mounts  # Shared role for CIFS mounts
+    - nas_mounts  # Single roles block
 
   tasks:
     - name: Ensure Python Docker SDK is installed
@@ -49,7 +52,6 @@
       loop:
         - { src: 'docker-compose.yaml.j2', dest: 'docker-compose.yaml' }
 
-    
     - name: Pull and Start Docker Stack
       community.docker.docker_compose_v2:
         project_src: "{{ plex_root }}"

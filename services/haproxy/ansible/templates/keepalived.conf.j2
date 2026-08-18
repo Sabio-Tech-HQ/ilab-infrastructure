@@ -17,7 +17,7 @@ vrrp_instance VI_1 {
     advert_int 1
     authentication {
         auth_type PASS
-        auth_pass 42
+        auth_pass {{ keepalived_auth_pass }}
     }
     virtual_ipaddress {
         10.10.10.200/24

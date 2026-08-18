@@ -9,8 +9,8 @@
   copy:
     dest: /root/.nas-credentials
     content: |
-      username={{ nas_user }}
-      password={{ nas_pass }}
+      username={{ jtnas_username }}
+      password={{ jtnas_password }}
     owner: root
     group: root
     mode: '0600'
@@ -25,7 +25,7 @@
 - name: Configure NAS mounts in fstab
   mount:
     path: "{{ item.path }}"
-    src: "//{{ nas_ip }}/{{ item.share }}"
+    src: "//{{ jtnas_ip }}/{{ item.share }}"
     fstype: cifs
     opts: "credentials=/root/.nas-credentials,uid=1000,gid=1000,rw,vers=3.0,nofail"
     state: mounted

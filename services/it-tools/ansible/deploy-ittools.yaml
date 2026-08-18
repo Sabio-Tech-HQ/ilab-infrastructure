@@ -1,0 +1,76 @@
+- name: Deploy IT-Tools
+  hosts: it-tools
+  become: true
+  vars_files:
+    - "../../../ansible/group_vars/all/vars.yml"
+  vars:
+    it_tools_dir: "/opt/it-tools"
+    it_tools_port: "8080"
+    ansible_user_id: "jthairu"
+
+  tasks:
+    # 1. Install Docker first (creates the 'docker' system group)
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    - name: Download Docker installation script
+      ansible.builtin.get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+
+    - name: Run Docker installation script
+      ansible.builtin.command: sh /tmp/get-docker.sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Ensure Docker service is running and enabled
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    # 2. Add user to docker group
+    - name: Ensure user is in the docker group
+      ansible.builtin.user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+        append: yes
+
+    - name: Reset connection to apply group membership
+      ansible.builtin.meta: reset_connection
+
+    # 3. Deploy IT-Tools via Docker Compose
+    - name: Create IT-Tools directory
+      ansible.builtin.file:
+        path: "{{ it_tools_dir }}"
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        mode: '0755'
+
+    - name: Deploy docker-compose.yml for IT-Tools
+      ansible.builtin.copy:
+        dest: "{{ it_tools_dir }}/docker-compose.yml"
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        mode: '0644'
+        content: |
+          services:
+            it-tools:
+              image: corentinth/it-tools:latest
+              container_name: it-tools
+              ports:
+                - "{{ it_tools_port }}:80"
+              restart: unless-stopped
+
+    - name: Start IT-Tools container
+      community.docker.docker_compose_v2:
+        project_src: "{{ it_tools_dir }}"
+        state: present
+        pull: missing

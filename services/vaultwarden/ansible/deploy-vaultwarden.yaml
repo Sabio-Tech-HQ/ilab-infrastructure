@@ -1,0 +1,89 @@
+---
+- hosts: vaultwarden
+  become: yes
+  vars:
+    vaultwarden_db_url: "postgresql://vaultwarden:{{ vaultwarden_db_password }}@{{ haproxy_vip }}:5432/vaultwarden"
+
+  tasks:
+    - name: Ensure essential utilities and Docker dependencies are installed
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - nano
+          - vim
+          - iputils-ping
+        state: present
+        update_cache: yes
+
+    - name: Create directory for Docker GPG key
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Docker official GPG key
+      shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+
+    - name: Set correct permissions on Docker GPG key
+      file:
+        path: /etc/apt/keyrings/docker.gpg
+        mode: '0644'
+
+    - name: Set up Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker and Docker Compose
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Add remote user to docker group
+      user:
+        name: "{{ ansible_user | default(ansible_ssh_user, true) }}"
+        groups: docker
+        append: yes
+
+    - name: Create Vaultwarden data directory
+      file:
+        path: /opt/vaultwarden
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Deploy Vaultwarden container via Docker Compose
+      copy:
+        content: |
+          services:
+            vaultwarden:
+              image: vaultwarden/server:latest
+              container_name: vaultwarden
+              restart: always
+              environment:
+                - DATABASE_URL={{ vaultwarden_db_url }}
+                - SIGNUPS_ALLOWED=true
+                - WEBSOCKET_ENABLED=true
+                - DOMAIN={{ vault_domain }}
+              ports:
+                - "80:80"
+              volumes:
+                - /opt/vaultwarden/data:/data
+        dest: /opt/vaultwarden/docker-compose.yml
+
+    - name: Start Vaultwarden services
+      command: docker compose up -d
+      args:
+        chdir: /opt/vaultwarden

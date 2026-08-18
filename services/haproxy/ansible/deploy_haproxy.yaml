@@ -22,42 +22,22 @@
         reload: yes
 
     - name: 3. Deploy HAProxy Config
-      copy:
+      template:
+        src: templates/haproxy.cfg.j2
         dest: /etc/haproxy/haproxy.cfg
-        content: |+
-          global
-              log /dev/log local0
-              stats socket /run/haproxy.sock mode 660 level admin
-              user haproxy
-              group haproxy
-
-          defaults
-              log global
-              mode tcp
-              option tcplog
-              timeout connect 5s
-              timeout client 3h
-              timeout server 3h
-
-          listen postgres_cluster
-              bind *:5432
-              mode tcp
-              option httpchk OPTIONS /primary
-              http-check expect status 200
-              {% for host in groups['databases'] %}
-              server {{ host }} {{ hostvars[host]['ansible_host'] }}:5432 check port 8008 inter 2s fall 3 rise 2
-              {% endfor %}
-
-          listen stats
-              bind *:8404
-              mode http
-              stats enable
-              stats uri /stats
+        owner: haproxy
+        group: haproxy
+        mode: '0644'
 
     - name: 4. Deploy Keepalived Config
       template:
         src: templates/keepalived.conf.j2
         dest: /etc/keepalived/keepalived.conf
+        owner: root
+        group: root
+        mode: '0644'
+      vars:
+        keepalived_auth_pass: "{{ lookup('community.general.bitwarden', 'haproxy-ansible', field='keepalived_auth_pass') }}"
 
     - name: 5. Start HAProxy Service
       service:
@@ -70,5 +50,3 @@
         name: keepalived
         state: restarted
         enabled: yes
-
-    
