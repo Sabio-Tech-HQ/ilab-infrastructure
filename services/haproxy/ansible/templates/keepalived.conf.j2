@@ -17,7 +17,7 @@ vrrp_instance VI_1 {
     advert_int 1
     authentication {
         auth_type PASS
-        auth_pass {{ keepalived_auth_pass }}
+        auth_pass {{ lookup('community.general.bitwarden', 'haproxy-ansible', field='keepalived_auth_pass') | first }}
     }
     virtual_ipaddress {
         10.10.10.200/24
