@@ -27,6 +27,8 @@
         dest: /etc/keepalived/keepalived.conf
         mode: '0644'
       notify: Restart keepalived
+      vars:
+        traefik_auth_password: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='traefik_auth_password') }}"
 
     - name: Ensure keepalived is started and enabled
       ansible.builtin.service:

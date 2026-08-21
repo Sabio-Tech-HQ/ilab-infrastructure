@@ -1,66 +1,78 @@
----
-- name: Add WireGuard Peer and Show QR Code
+- name: Add WireGuard Peers and Show QR Code
   hosts: vpn
   become: true
   vars:
-    peer_name: "phone-jthairu"
-    peer_ip: "10.20.10.2/32"
-    # Pull from inventory or group_vars, or set here as standard config
     server_public_endpoint: "{{ wireguard_public_endpoint | default('69.255.76.106:51820') }}"
     server_wg_ip: "10.20.10.1"
+    wireguard_peers:
+      - name: "phone-jthairu"
+        ip: "10.20.10.2/32"
+      - name: "macbook-pro"
+        ip: "10.20.10.3/32"
 
   tasks:
-    - name: Generate Peer Keys
+    - name: Generate Peer Keys if they don't exist
       ansible.builtin.shell: |
         umask 077
-        wg genkey | tee /etc/wireguard/{{ peer_name }}_private.key | wg pubkey > /etc/wireguard/{{ peer_name }}_public.key
-      args:
-        creates: "/etc/wireguard/{{ peer_name }}_private.key"
+        if [ ! -f /etc/wireguard/{{ item.name }}_private.key ]; then
+          wg genkey | tee /etc/wireguard/{{ item.name }}_private.key | wg pubkey > /etc/wireguard/{{ item.name }}_public.key
+        fi
+      loop: "{{ wireguard_peers }}"
 
-    - name: Read Keys for Config Generation
+    - name: Read Server Public Key
       ansible.builtin.slurp:
-        src: "{{ item }}"
-      register: keys
-      loop:
-        - /etc/wireguard/{{ peer_name }}_private.key
-        - /etc/wireguard/{{ peer_name }}_public.key
-        - /etc/wireguard/publickey # The Server's Public Key
+        src: /etc/wireguard/publickey
+      register: server_pubkey
 
-    - name: Add Peer to Server Config
+    - name: Read Peer Public Keys
+      ansible.builtin.slurp:
+        src: "/etc/wireguard/{{ item.name }}_public.key"
+      register: peer_pubkeys
+      loop: "{{ wireguard_peers }}"
+
+    - name: Read Peer Private Keys
+      ansible.builtin.slurp:
+        src: "/etc/wireguard/{{ item.name }}_private.key"
+      register: peer_privkeys
+      loop: "{{ wireguard_peers }}"
+
+    - name: Add Peers to Server Config
       ansible.builtin.blockinfile:
         path: /etc/wireguard/wg0.conf
-        marker: "# {mark} PEER: {{ peer_name }}"
+        marker: "# {mark} PEER: {{ item.name }}"
         block: |
           [Peer]
-          PublicKey = {{ keys.results[1].content | b64decode | trim }}
-          AllowedIPs = {{ peer_ip }}
+          PublicKey = {{ (peer_pubkeys.results | selectattr('item.name', 'equalto', item.name) | first).content | b64decode | trim }}
+          AllowedIPs = {{ item.ip }}
+      loop: "{{ wireguard_peers }}"
       notify: Sync WireGuard
 
-    - name: Generate Client Config File
+    - name: Generate Client Config Files
       ansible.builtin.copy:
-        dest: "/etc/wireguard/{{ peer_name }}.conf"
+        dest: "/etc/wireguard/{{ item.name }}.conf"
         content: |
           [Interface]
-          PrivateKey = {{ keys.results[0].content | b64decode | trim }}
-          Address = {{ peer_ip }}
+          PrivateKey = {{ (peer_privkeys.results | selectattr('item.name', 'equalto', item.name) | first).content | b64decode | trim }}
+          Address = {{ item.ip }}
           DNS = 1.1.1.1
 
           [Peer]
-          PublicKey = {{ keys.results[2].content | b64decode | trim }}
+          PublicKey = {{ server_pubkey.content | b64decode | trim }}
           Endpoint = {{ server_public_endpoint }}
           AllowedIPs = 0.0.0.0/0
           PersistentKeepalive = 25
         mode: '0600'
+      loop: "{{ wireguard_peers }}"
 
-    - name: Generate QR Code for Terminal
-      ansible.builtin.shell: "qrencode -t ansiutf8 < /etc/wireguard/{{ peer_name }}.conf"
+    - name: Generate QR Code for Phone
+      ansible.builtin.shell: "qrencode -t ansiutf8 < /etc/wireguard/phone-jthairu.conf"
       register: qr_code
       changed_when: false
 
-    - name: Display QR Code
+    - name: Display Phone QR Code
       ansible.builtin.debug:
         msg: "{{ qr_code.stdout_lines }}"
 
   handlers:
     - name: Sync WireGuard
-      ansible.builtin.shell: "wg syncconf wg0 <(wg-quick strip wg0)"
+      ansible.builtin.shell: "wg-quick strip wg0 | wg syncconf wg0 /dev/stdin"

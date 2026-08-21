@@ -5,8 +5,8 @@ global
     group haproxy
 
 defaults
-    log     global
-    option  dontlognull
+    log      global
+    option   dontlognull
     timeout connect 5s
     timeout client  50s
     timeout server  50s
@@ -59,4 +59,17 @@ backend vaultwarden_backend
     server vaultwarden-02 10.10.10.208:80 check
     server vaultwarden-03 10.10.10.209:80 check
 
+# --- HTTPS (TCP Passthrough to Traefik on port 443) ---
+frontend vaultwarden_https_front
+    bind *:443
+    mode tcp
+    option tcplog
+    default_backend vaultwarden_https_backend
+
+backend vaultwarden_https_backend
+    mode tcp
+    balance roundrobin
+    server vaultwarden-01 10.10.10.207:443 check
+    server vaultwarden-02 10.10.10.208:443 check
+    server vaultwarden-03 10.10.10.209:443 check
 

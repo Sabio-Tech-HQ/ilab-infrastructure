@@ -1,0 +1,173 @@
+---
+- name: Provision Penpot Environment
+  hosts: penpot
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # PostgreSQL is external to this LXC.
+    # haproxy_vip should be defined in your Ansible inventory/group_vars.
+    PENPOT_DATABASE_URL: "postgresql://{{ haproxy_vip }}:5432/penpot"
+
+  tasks:
+
+    # ------------------------------------------------------------
+    # USER
+    # ------------------------------------------------------------
+
+    - name: Ensure jthairu user exists
+      ansible.builtin.user:
+        name: jthairu
+        shell: /bin/bash
+        groups: sudo
+        append: yes
+        state: present
+
+    # ------------------------------------------------------------
+    # SYSTEM
+    # ------------------------------------------------------------
+
+    - name: Update apt cache and upgrade packages
+      ansible.builtin.apt:
+        upgrade: dist
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+        state: present
+
+    # ------------------------------------------------------------
+    # DOCKER
+    # ------------------------------------------------------------
+
+    - name: Download Docker installation script
+      ansible.builtin.get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+
+    - name: Install Docker
+      ansible.builtin.command:
+        cmd: sh /tmp/get-docker.sh
+        creates: /usr/bin/docker
+
+    - name: Ensure Docker service is running and enabled
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add jthairu to docker group
+      ansible.builtin.user:
+        name: jthairu
+        groups: docker
+        append: yes
+
+    - name: Reset SSH connection to apply docker group membership
+      ansible.builtin.meta: reset_connection
+
+    # ------------------------------------------------------------
+    # PENPOT DIRECTORY
+    # ------------------------------------------------------------
+
+    - name: Create Penpot directory
+      ansible.builtin.file:
+        path: /opt/penpot
+        state: directory
+        owner: jthairu
+        group: jthairu
+        mode: '0755'
+
+    # ------------------------------------------------------------
+    # PENPOT DOCKER COMPOSE
+    # ------------------------------------------------------------
+
+    - name: Create Penpot docker-compose.yml
+      ansible.builtin.copy:
+        dest: /opt/penpot/docker-compose.yml
+        owner: jthairu
+        group: jthairu
+        mode: '0644'
+        content: |
+          services:
+            penpot-frontend:
+              image: penpotapp/frontend:latest
+              container_name: penpot-frontend
+              restart: unless-stopped
+              depends_on:
+                - penpot-backend
+                - penpot-exporter
+              ports:
+                - "9001:8080"
+              environment:
+                PENPOT_PUBLIC_URI: "https://penpot.mwakilishi.com"
+                PENPOT_BACKEND_URI: "http://penpot-backend:6060"
+                PENPOT_EXPORTER_URI: "http://penpot-exporter:6061"
+
+            penpot-backend:
+              image: penpotapp/backend:latest
+              container_name: penpot-backend
+              restart: unless-stopped
+
+              depends_on:
+                - penpot-valkey
+
+              environment:
+                PENPOT_PUBLIC_URI: "https://penpot.mwakilishi.com"
+                PENPOT_SECRET_KEY: "{{ PENPOT_SECRET_KEY }}"
+                PENPOT_FLAGS: "enable-registration disable-email-verification"
+                PENPOT_DATABASE_URI: "{{ PENPOT_DATABASE_URL }}"
+                PENPOT_DATABASE_USERNAME: "penpot"
+                PENPOT_DATABASE_PASSWORD: "{{ PENPOT_DATABASE_PASSWORD }}"
+                PENPOT_REDIS_URI: "redis://penpot-valkey/0"
+
+            penpot-exporter:
+              image: penpotapp/exporter:latest
+              container_name: penpot-exporter
+              restart: unless-stopped
+              environment:
+                PENPOT_PUBLIC_URI: "https://penpot.mwakilishi.com"
+                PENPOT_INTERNAL_URI: "http://penpot-frontend:8080"
+                PENPOT_REDIS_URI: "redis://penpot-valkey/0"
+                PENPOT_SECRET_KEY: "{{ PENPOT_SECRET_KEY }}"
+
+            penpot-valkey:
+              image: valkey/valkey:8
+              container_name: penpot-valkey
+              restart: unless-stopped
+
+    # ------------------------------------------------------------
+    # START PENPOT
+    # ------------------------------------------------------------
+
+    - name: Pull Penpot images
+      ansible.builtin.command:
+        cmd: docker compose -p penpot pull
+        chdir: /opt/penpot
+      become_user: jthairu
+
+    - name: Start Penpot
+      ansible.builtin.command:
+        cmd: docker compose -p penpot up -d
+        chdir: /opt/penpot
+      become_user: jthairu
+
+    # ------------------------------------------------------------
+    # STATUS
+    # ------------------------------------------------------------
+
+    - name: Show Penpot container status
+      ansible.builtin.command:
+        cmd: docker compose -p penpot ps
+        chdir: /opt/penpot
+      become_user: jthairu
+      register: penpot_status
+      changed_when: false
+
+    - name: Display Penpot container status
+      ansible.builtin.debug:
+        var: penpot_status.stdout_lines

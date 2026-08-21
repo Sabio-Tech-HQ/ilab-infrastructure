@@ -6,6 +6,7 @@ resource "postgresql_role" "jthairu" {
   superuser = true
 }
 
+# --- Vaultwarden ---
 resource "postgresql_role" "vaultwarden" {
   name     = "vaultwarden"
   login    = true
@@ -17,4 +18,14 @@ resource "postgresql_database" "vaultwarden" {
   owner = postgresql_role.vaultwarden.name
 }
 
+# --- Penpot ---
+resource "postgresql_role" "penpot" {
+  name     = "penpot"
+  login    = true
+  password = var.penpot_db_password
+}
 
+resource "postgresql_database" "penpot" {
+  name  = "penpot"
+  owner = postgresql_role.penpot.name
+}

@@ -300,8 +300,20 @@ http:
       service: ittools-service
       tls:
         certResolver: route53_aws
+    penpot:
+      rule: "Host(`penpot.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: penpot-service
+      tls:
+        certResolver: route53_aws
 
   services: 
+     
+    penpot-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.98:9001/"  
     
     ittools-service:
       loadBalancer:
