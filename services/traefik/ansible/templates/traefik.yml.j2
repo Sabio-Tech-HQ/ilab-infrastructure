@@ -18,7 +18,6 @@ entryPoints:
   websecure:
     address: ":443"
 
-  # 🚀 Added dedicated health check port to stop "Peeking" timeout logs
   traefik_health:
     address: ":8082"
 
@@ -35,15 +34,12 @@ providers:
 log:
   level: INFO
 
-# 🛡️ Only the Primary Node (index 0) handles Let's Encrypt
-{% if inventory_hostname == groups['traefik_nodes'][0] %}
 certificatesResolvers:
   route53_aws:
     acme:
-      email: {{ traefik_acme_email }} 
+      email: "{{ traefik_acme_email }}" 
       storage: /etc/traefik/acme.json
       dnsChallenge:
         provider: route53
         delayBeforeCheck: 90
         resolvers: ["1.1.1.1:53", "8.8.8.8:53"]
-{% endif %}

@@ -5,9 +5,15 @@ http:
         scheme: https
         permanent: true
 
+    forwarded-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+
   serversTransports:
     unifi-transport:
       insecureSkipVerify: true
+
     proxmox-transport:
       insecureSkipVerify: true
 
@@ -219,6 +225,7 @@ http:
       service: kibana-service
       tls:
         certResolver: route53_aws
+
     drupal:
       rule: "Host(`drupal.mwakilishi.com`)"
       entryPoints:
@@ -226,7 +233,7 @@ http:
       service: drupal-service
       tls:
         certResolver: route53_aws
-    
+
     pacs:
       rule: "Host(`pacs.mwakilishi.com`)"
       entryPoints:
@@ -248,6 +255,8 @@ http:
       entryPoints:
         - websecure
       service: devops-service
+      middlewares:
+        - forwarded-headers
       tls:
         certResolver: route53_aws
 
@@ -256,15 +265,21 @@ http:
       entryPoints:
         - websecure
       service: devops-service
+      middlewares:
+        - forwarded-headers
       tls:
         certResolver: route53_aws
-    nidate.devops:
-      rule: "Host(`nidate.devops.mwakilishi.com`)"
+
+    nidate:
+      rule: "Host(`nidate.mwakilishi.com`)"
       entryPoints:
         - websecure
-      service: devops-service 
+      service: nidate-service
+      middlewares:
+        - forwarded-headers
       tls:
         certResolver: route53_aws
+
     memos:
       rule: "Host(`memos.mwakilishi.com`)"
       entryPoints:
@@ -272,6 +287,7 @@ http:
       service: memos-service
       tls:
         certResolver: route53_aws
+
     haproxy:
       rule: "Host(`haproxy.mwakilishi.com`)"
       entryPoints:
@@ -279,6 +295,7 @@ http:
       service: haproxy-service
       tls:
         certResolver: route53_aws
+
     maxscale:
       rule: "Host(`maxscale.mwakilishi.com`)"
       entryPoints:
@@ -286,6 +303,7 @@ http:
       service: maxscale-service
       tls:
         certResolver: route53_aws
+
     ai:
       rule: "Host(`ai.mwakilishi.com`)"
       entryPoints:
@@ -293,6 +311,7 @@ http:
       service: ai-service
       tls:
         certResolver: route53_aws
+
     ittools:
       rule: "Host(`ittools.mwakilishi.com`)"
       entryPoints:
@@ -300,6 +319,7 @@ http:
       service: ittools-service
       tls:
         certResolver: route53_aws
+
     penpot:
       rule: "Host(`penpot.mwakilishi.com`)"
       entryPoints:
@@ -308,17 +328,35 @@ http:
       tls:
         certResolver: route53_aws
 
-  services: 
-     
+    opencode:
+      rule: "Host(`opencode.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: opencode-service
+      tls:
+        certResolver: route53_aws
+
+  services:
+    opencode-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.216:4096/"
+    
+    nidate-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.216:8080/"
+
     penpot-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.98:9001/"  
-    
+          - url: "http://10.10.10.98:9001/"
+
     ittools-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.119:8080/"  
+          - url: "http://10.10.10.119:8080/"
+
     ai-service:
       loadBalancer:
         servers:
@@ -328,7 +366,7 @@ http:
       loadBalancer:
         servers:
           - url: "http://10.10.10.50:8989/"
-    
+
     haproxy-service:
       loadBalancer:
         servers:
@@ -343,7 +381,7 @@ http:
       loadBalancer:
         servers:
           - url: "http://10.10.10.216:80"
-   
+
     kafka-service:
       loadBalancer:
         servers:
@@ -358,6 +396,7 @@ http:
       loadBalancer:
         servers:
           - url: "http://10.10.10.99:8090"
+
     drupal-service:
       loadBalancer:
         servers:
@@ -371,24 +410,24 @@ http:
     airflow-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.216:8080"
+          - url: "http://10.10.10.216:80"
 
     pihole01-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.11/admin"  
+          - url: "http://10.10.10.11/admin"
         passHostHeader: true
 
     pihole02-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.12/admin"  
+          - url: "http://10.10.10.12/admin"
         passHostHeader: true
 
     pihole03-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.12/admin"  
+          - url: "http://10.10.10.12/admin"
         passHostHeader: true
 
     hass-service:

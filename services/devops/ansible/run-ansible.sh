@@ -9,7 +9,7 @@ if [ "$status" != "unlocked" ]; then
 fi
 
 # Fetch variables from your Bitwarden item (e.g., 'ansible-secrets')
-export ANSIBLE_BECOME_PASS=$(bw get item jellyfin-ansible | jq -r '.fields[] | select(.name=="become_password").value')
+export ANSIBLE_BECOME_PASS=$(bw get item devops-ansible | jq -r '.fields[] | select(.name=="become_password").value')
 # Add any other required secrets here...
 
 # Run ansible-playbook with any passed arguments

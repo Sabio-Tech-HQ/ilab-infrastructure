@@ -159,7 +159,9 @@
         group: jthairu
         mode: '0755'
       loop:
-        - '/home/jthairu/mwakilishi'
+        - '/home/jthairu/ilab-infrastructure'
+        - '/home/jthairu/mdko-portal'
+        - '/home/jthairu/nidate'
 
     - name: Clone all development repositories from Bitwarden records
       ansible.builtin.git:
@@ -172,10 +174,51 @@
       loop:
         - repo: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='repo_ilab') | first }}"
           dest: '/home/jthairu/ilab-infrastructure'
-        - repo: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='repo_mwakilishi') | first }}"
-          dest: '/home/jthairu/mwakilishi/app'
         - repo: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='repo_mdko') | first }}"
           dest: '/home/jthairu/mdko-portal'
         - repo: "{{ lookup('community.general.bitwarden', 'devops-ansible', field='repo_nidate') | first }}"
           dest: '/home/jthairu/nidate'
       when: lookup('community.general.bitwarden', 'devops-ansible', field='repo_ilab', default='') != ''
+
+    # ==========================================
+    # 8. OPENCODE
+    # ==========================================
+
+    - name: Install OpenCode
+      become_user: jthairu
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://opencode.ai/install | bash
+      args:
+        creates: /home/jthairu/.opencode/bin/opencode
+
+    - name: Ensure OpenCode configuration directory exists
+      ansible.builtin.file:
+        path: /home/jthairu/.config/opencode
+        state: directory
+        owner: jthairu
+        group: jthairu
+        mode: '0755'
+
+    - name: Install OpenCode systemd service
+      ansible.builtin.template:
+        src: opencode-web.service.j2
+        dest: /etc/systemd/system/opencode-web.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Restart OpenCode
+
+    - name: Enable and start OpenCode Web
+      ansible.builtin.systemd:
+        name: opencode-web
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+  handlers:
+    - name: Restart OpenCode
+      ansible.builtin.systemd:
+        name: opencode-web
+        state: restarted
+        daemon_reload: yes

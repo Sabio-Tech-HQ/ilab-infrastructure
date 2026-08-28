@@ -1,0 +1,10 @@
+#!/bin/bash
+ACME_PATH="{{ traefik_dir }}/acme.json"
+NODES=({% for host in groups['traefik_nodes'] %}{% if host != inventory_hostname %}"{{ hostvars[host]['ansible_host'] | default(host) }}" {% endif %}{% endfor %})
+
+chmod 600 "$ACME_PATH"
+
+for node in "${NODES[@]}"; do
+    rsync -avz -e "ssh -o StrictHostKeyChecking=no" "$ACME_PATH" "root@$node:$ACME_PATH"
+    ssh root@$node "chmod 600 $ACME_PATH && cd {{ traefik_dir }} && docker compose restart"
+done

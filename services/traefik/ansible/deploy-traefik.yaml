@@ -4,9 +4,13 @@
   vars_files:
     - "../../../ansible/group_vars/all/vars.yml"
   tasks:
-    - name: Install keepalived
+    - name: Install keepalived and iputils/iproute tools
       ansible.builtin.apt:
-        name: keepalived
+        name:
+          - keepalived
+          - iproute2
+          - iputils-ping
+          - rsync
         state: present
         update_cache: yes
 
@@ -73,13 +77,51 @@
         - "{{ traefik_dir }}"
         - "{{ traefik_dir }}/dynamic"
 
-    - name: Ensure acme.json exists with correct permissions
+    - name: Ensure acme.json placeholder exists on primary
       ansible.builtin.file:
         path: "{{ traefik_dir }}/acme.json"
         state: touch
         owner: root
         group: root
         mode: '0600'
+      run_once: true
+      delegate_to: "{{ groups['traefik_nodes'][0] }}"
+
+    - name: Fetch primary acme.json
+      ansible.builtin.fetch:
+        src: "{{ traefik_dir }}/acme.json"
+        dest: "/tmp/acme.json"
+        flat: yes
+      run_once: true
+      delegate_to: "{{ groups['traefik_nodes'][0] }}"
+      ignore_errors: yes
+
+    - name: Check if fetched acme.json exists locally
+      ansible.builtin.stat:
+        path: "/tmp/acme.json"
+      register: fetched_acme
+      delegate_to: localhost
+      run_once: true
+
+    - name: Distribute acme.json to secondary nodes before startup
+      ansible.builtin.copy:
+        src: "/tmp/acme.json"
+        dest: "{{ traefik_dir }}/acme.json"
+        owner: root
+        group: root
+        mode: '0600'
+      when: 
+        - inventory_hostname != groups['traefik_nodes'][0]
+        - fetched_acme.stat.exists
+
+    - name: Ensure fallback empty acme.json exists on secondary nodes if fetch failed
+      ansible.builtin.file:
+        path: "{{ traefik_dir }}/acme.json"
+        state: touch
+        owner: root
+        group: root
+        mode: '0600'
+      when: inventory_hostname != groups['traefik_nodes'][0]
 
     - name: Deploy Traefik Static Config
       ansible.builtin.template:
@@ -103,34 +145,60 @@
         dest: "{{ traefik_dir }}/docker-compose.yml"
         mode: '0644'
       vars:
-        aws_access_key: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='aws_access_key') }}"
-        aws_secret_key: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='aws_secret_key') }}"
+        aws_access_key: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='aws_access_key')[0] }}"
+        aws_secret_key: "{{ lookup('community.general.bitwarden', 'traefik-ansible', field='aws_secret_key')[0] }}"
 
-    - name: Start Traefik containers
+    - name: Start Traefik containers cluster-wide
       community.docker.docker_compose_v2:
         project_src: "{{ traefik_dir }}"
         state: present
         pull: missing
 
-    - name: Sync acme.json across the cluster
-      block:
-        - name: Fetch the primary acme.json
-          ansible.builtin.fetch:
-            src: "{{ traefik_dir }}/acme.json"
-            dest: "/tmp/acme.json"
-            flat: yes
-          run_once: true
-          delegate_to: "{{ groups['traefik_nodes'][0] }}"
+    - name: Ensure SSH directory exists for root
+      ansible.builtin.file:
+        path: "/root/.ssh"
+        state: directory
+        mode: '0700'
+      when: inventory_hostname == groups['traefik_nodes'][0]
 
-        - name: Distribute acme.json to secondary nodes
-          ansible.builtin.copy:
-            src: "/tmp/acme.json"
-            dest: "{{ traefik_dir }}/acme.json"
-            owner: root
-            group: root
-            mode: '0600'
-          when: inventory_hostname != groups['traefik_nodes'][0]
+    - name: Generate SSH key on primary node if missing
+      community.crypto.openssh_keypair:
+        path: "/root/.ssh/id_rsa"
+        type: rsa
+        size: 4096
+        state: present
+      when: inventory_hostname == groups['traefik_nodes'][0]
 
-        - name: Restart secondary Traefik nodes to apply certs
-          ansible.builtin.shell: docker restart traefik
-          when: inventory_hostname != groups['traefik_nodes'][0]
+    - name: Fetch public key from primary node
+      ansible.builtin.slurp:
+        src: "/root/.ssh/id_rsa.pub"
+      register: primary_pubkey
+      when: inventory_hostname == groups['traefik_nodes'][0]
+
+    - name: Authorize primary node SSH key on all nodes
+      ansible.builtin.authorized_key:
+        user: root
+        state: present
+        key: "{{ hostvars[groups['traefik_nodes'][0]]['primary_pubkey']['ansible_facts']['slurp'] | default(hostvars[groups['traefik_nodes'][0]]['primary_pubkey']['content'] | b64decode) }}"
+
+    - name: Copy sync script to primary node
+      ansible.builtin.template:
+        src: templates/sync-acme.sh.j2
+        dest: "/usr/local/bin/sync-acme.sh"
+        mode: '0700'
+      when: inventory_hostname == groups['traefik_nodes'][0]
+
+    - name: Ensure cron package is installed on primary node
+      ansible.builtin.apt:
+        name: cron
+        state: present
+      when: inventory_hostname == groups['traefik_nodes'][0]
+
+    - name: Setup hourly cron job for acme sync on primary node
+      ansible.builtin.cron:
+        name: "Sync Traefik ACME certificates to secondary nodes"
+        minute: "0"
+        hour: "*"
+        job: "/usr/local/bin/sync-acme.sh >/dev/null 2>&1"
+        user: root
+      when: inventory_hostname == groups['traefik_nodes'][0]

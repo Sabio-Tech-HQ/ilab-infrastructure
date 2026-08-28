@@ -6,7 +6,7 @@
     ai_base_dir: "/opt/ai-stack"
 
   vars_files:
-    - /home/jthairu/ilab-infrastructure/group_vars/vault.yml
+    - /home/jthairu/ilab-infrastructure/ansible/vaults/legacy-vault.yml
 
   tasks:
     - name: Ensure dependency prerequisites are installed
@@ -86,7 +86,7 @@
                 - ollama_data:/root/.ollama
               environment:
                 - OLLAMA_HOST=0.0.0.0
-                - OLLAMA_NUM_THREADS=6
+                - OLLAMA_NUM_THREADS=16
 
             open-webui:
               image: ghcr.io/open-webui/open-webui:main
