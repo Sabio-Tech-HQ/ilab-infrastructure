@@ -4,9 +4,14 @@
 
   vars:
     ai_base_dir: "/opt/ai-stack"
+    proxmox_host: "10.10.10.101"
 
-  vars_files:
-    - /home/jthairu/ilab-infrastructure/ansible/vaults/legacy-vault.yml
+    groq_api_key: "{{ (query('community.general.bitwarden', 'ollama-ansible', field='GROQ_API_KEY') | flatten)[0] | default('') }}"
+    groq_api_key2: "{{ (query('community.general.bitwarden', 'ollama-ansible', field='GROQ_API_KEY2', errors='ignore') | flatten)[0] | default('') }}"
+    gemini_api_key: "{{ (query('community.general.bitwarden', 'ollama-ansible', field='GEMINI_API_KEY') | flatten)[0] | default('') }}"
+    openrouter_api_key: "{{ (query('community.general.bitwarden', 'ollama-ansible', field='OPENROUTER_API_KEY') | flatten)[0] | default('') }}"
+    proxmox_token_name: "{{ (query('community.general.bitwarden', 'ollama-ansible', field='proxmox_token_name') | flatten)[0] | default('') }}"
+    proxmox_token_secret: "{{ (query('community.general.bitwarden', 'ollama-ansible', field='proxmox_token_secret') | flatten)[0] | default('') }}"
 
   tasks:
     - name: Ensure dependency prerequisites are installed
@@ -71,7 +76,36 @@
         group: "{{ ansible_user }}"
         mode: '0755'
 
-    - name: Deploy Docker Compose configuration file with Free Cloud API integrations
+    - name: Remove stale config.json directory if it exists
+      file:
+        path: "{{ ai_base_dir }}/config.json"
+        state: absent
+
+    - name: Deploy MCPO config.json for Proxmox MCP
+      copy:
+        dest: "{{ ai_base_dir }}/config.json"
+        content: |
+          {
+            "mcpServers": {
+              "proxmox": {
+                "command": "uvx",
+                "args": ["mcp-server-proxmox"],
+                "env": {
+                  "PVE_HOST": "{{ proxmox_host }}",
+                  "PVE_PORT": "8006",
+                  "PVE_USER": "root@pam",
+                  "PVE_TOKEN_ID": "root@pam!{{ proxmox_token_name }}",
+                  "PVE_TOKEN_SECRET": "{{ proxmox_token_secret }}",
+                  "PVE_VERIFY_SSL": "false"
+                }
+              }
+            }
+          }
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+
+    - name: Deploy Docker Compose configuration file
       copy:
         dest: "{{ ai_base_dir }}/docker-compose.yml"
         content: |
@@ -88,6 +122,16 @@
                 - OLLAMA_HOST=0.0.0.0
                 - OLLAMA_NUM_THREADS=16
 
+            mcpo:
+              image: ghcr.io/open-webui/mcpo:main
+              container_name: mcpo
+              restart: unless-stopped
+              command: mcpo --port 8000 --host 0.0.0.0 --config /app/config.json
+              ports:
+                - "8000:8000"
+              volumes:
+                - ./config.json:/app/config.json
+
             open-webui:
               image: ghcr.io/open-webui/open-webui:main
               container_name: open-webui
@@ -96,21 +140,19 @@
                 - "3000:8080"
               environment:
                 - OLLAMA_BASE_URL=http://ollama:11434
-                # Configure primary OpenAI-compatible provider (Groq) using your vault keys
-                - OPENAI_API_BASE_URL=https://api.groq.com/openai/v1
-                - OPENAI_API_KEY={{ GROQ_API_KEY }}
-                # Additional environment hooks/keys for reference inside container
-                - GROQ_API_KEY={{ GROQ_API_KEY }}
-                - GROQ_API_KEY2={{ GROQ_API_KEY2 | default('') }}
-                - GEMINI_API_KEY={{ GEMINI_API_KEY | default('') }}
-                - OPENROUTER_API_KEY={{ OPENROUTER_API_KEY }}
-                
-                # --- THIS LOCKS IN YOUR DATABASE ENCRYPTION ---
+                - OPENAI_API_BASE_URL=https://openrouter.ai/api/v1
+                - OPENAI_API_KEY={{ openrouter_api_key }}
+                - OPENROUTER_API_KEY={{ openrouter_api_key }}
+                - GROQ_API_KEY={{ groq_api_key }}
+                - GROQ_API_KEY2={{ groq_api_key2 }}
+                - GEMINI_API_KEY={{ gemini_api_key }}
                 - WEBUI_SECRET_KEY=ilab_secure_static_key_do_not_change_2026
+                - ENABLE_MCP=true
               volumes:
                 - open_webui_data:/app/backend/data
               depends_on:
                 - ollama
+                - mcpo
 
           volumes:
             ollama_data:
@@ -125,8 +167,9 @@
         state: latest
         update_cache: yes
 
-    - name: Up and run AI stack containers via Docker Compose
+    - name: Force recreate AI stack containers via Docker Compose
       community.docker.docker_compose_v2:
         project_src: "{{ ai_base_dir }}"
-        state: restarted
+        state: present
+        recreate: always
       become: yes
