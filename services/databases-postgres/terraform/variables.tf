@@ -20,3 +20,9 @@ variable "penpot_db_password" {
   type        = string
   sensitive   = true
 }
+
+variable "paperless_db_password" {
+  description = "Password for the Paperless Ngx PostgreSQL user"
+  type        = string
+  sensitive   = true
+}

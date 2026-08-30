@@ -119,6 +119,12 @@
         group: "{{ ansible_user }}"
         mode: '0644'
 
+    - name: Ensure Docker compose plugin is updated to latest version
+      apt:
+        name: docker-compose-plugin
+        state: latest
+        update_cache: yes
+
     - name: Up and run AI stack containers via Docker Compose
       community.docker.docker_compose_v2:
         project_src: "{{ ai_base_dir }}"

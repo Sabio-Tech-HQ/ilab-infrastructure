@@ -1,0 +1,204 @@
+- name: Provision Paperless-ngx Environment
+  hosts: paperless-ngx
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # PostgreSQL is external to this LXC (Matching your Penpot database structure)
+    PAPERLESS_DATABASE_URL: "postgresql://{{ haproxy_vip }}:5432/paperless"
+    PAPERLESS_DIR: "/opt/paperless"
+
+  tasks:
+
+    # ------------------------------------------------------------
+    # USER
+    # ------------------------------------------------------------
+
+    - name: Ensure jthairu user exists
+      ansible.builtin.user:
+        name: jthairu
+        shell: /bin/bash
+        groups: sudo
+        append: yes
+        state: present
+
+    # ------------------------------------------------------------
+    # SYSTEM
+    # ------------------------------------------------------------
+
+    - name: Update apt cache and upgrade packages
+      ansible.builtin.apt:
+        upgrade: dist
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+        state: present
+
+    # ------------------------------------------------------------
+    # DOCKER
+    # ------------------------------------------------------------
+
+    - name: Download Docker installation script
+      ansible.builtin.get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+
+    - name: Install Docker
+      ansible.builtin.command:
+        cmd: sh /tmp/get-docker.sh
+        creates: /usr/bin/docker
+
+    - name: Ensure Docker service is running and enabled
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add jthairu to docker group
+      ansible.builtin.user:
+        name: jthairu
+        groups: docker
+        append: yes
+
+    - name: Reset SSH connection to apply docker group membership
+      ansible.builtin.meta: reset_connection
+
+    # ------------------------------------------------------------
+    # PAPERLESS SUBSYSTEM DIRECTORIES
+    # ------------------------------------------------------------
+
+    - name: Create local container directories with strict ownership
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: jthairu
+        group: jthairu
+        mode: '0755'
+      loop:
+        - "{{ PAPERLESS_DIR }}"
+        - "{{ PAPERLESS_DIR }}/data"
+        - "{{ PAPERLESS_DIR }}/export"
+
+    - name: Ensure NAS/Host mount directories exist (Skip chown to prevent LXC errors)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0777' # Matches the global host write accessibility permissions we unlocked
+      loop:
+        - "{{ PAPERLESS_DIR }}/media"
+        - "{{ PAPERLESS_DIR }}/consume"
+
+    # ------------------------------------------------------------
+    # PAPERLESS DOCKER COMPOSE
+    # ------------------------------------------------------------
+
+    - name: Create Paperless-ngx docker-compose.yml
+      ansible.builtin.copy:
+        dest: "{{ PAPERLESS_DIR }}/docker-compose.yml"
+        owner: jthairu
+        group: jthairu
+        mode: '0644'
+        content: |
+          services:
+            paperless-redis:
+              image: docker.io/library/redis:7
+              container_name: paperless-redis
+              restart: unless-stopped
+              volumes:
+                - ./data/redis:/data
+
+            # Gotenberg engine compiles LibreOffice tasks to handle raw document conversions
+            paperless-gotenberg:
+              image: docker.io/gotenberg/gotenberg:8
+              container_name: paperless-gotenberg
+              restart: unless-stopped
+              command:
+                - "gotenberg"
+                - "--chromium-disable-javascript=true"
+                - "--chromium-allow-list=file:///tmp/.*"
+
+            # Swapped to the official upstream Apache Tika image tracking registry
+            paperless-tika:
+              image: docker.io/apache/tika:2.9.2.1
+              container_name: paperless-tika
+              restart: unless-stopped
+
+            paperless-webserver:
+              image: ghcr.io/paperless-ngx/paperless-ngx:latest
+              container_name: paperless-webserver
+              restart: unless-stopped
+              depends_on:
+                - paperless-redis
+                - paperless-gotenberg
+                - paperless-tika
+              ports:
+                - "8000:8000"
+              volumes:
+                - ./data:/usr/src/paperless/data
+                - ./media:/usr/src/paperless/media
+                - ./consume:/usr/src/paperless/consume
+                - ./export:/usr/src/paperless/export
+              environment:
+                # App config variables
+                PAPERLESS_URL: "https://paperless.mwakilishi.com"
+                PAPERLESS_REDIS: "redis://paperless-redis:6379"
+                PAPERLESS_SECRET_KEY: "{{ PAPERLESS_SECRET_KEY }}"
+                PAPERLESS_TIME_ZONE: "America/New_York"
+                PAPERLESS_OCR_LANGUAGE: "eng"
+
+                # SECURITY FIX: Trusts the Reverse Proxy Domain Name to eliminate 403 Upload blocks
+                PAPERLESS_CSRF_TRUSTED_ORIGINS: "https://paperless.mwakilishi.com"
+
+                # Tika & Gotenberg bindings for Word / Office parsing
+                PAPERLESS_TIKA_ENABLED: "1"
+                PAPERLESS_TIKA_ENDPOINT: "http://paperless-tika:9998"
+                PAPERLESS_TIKA_GOTENBERG_ENDPOINT: "http://paperless-gotenberg:3000"
+                
+                # Allows word processing document types natively through the web dashboard
+                PAPERLESS_CONSUMER_ALLOWED_MIME_TYPES: "application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+
+                # External PostgreSQL integration variables
+                PAPERLESS_DBENGINE: "postgresql"
+                PAPERLESS_DBHOST: "{{ haproxy_vip }}"
+                PAPERLESS_DBPORT: "5432"
+                PAPERLESS_DBNAME: "paperless"
+                PAPERLESS_DBUSER: "paperless"
+                PAPERLESS_DBPASS: "{{ PAPERLESS_DATABASE_PASSWORD }}"
+
+    # ------------------------------------------------------------
+    # START PAPERLESS-NGX
+    # ------------------------------------------------------------
+
+    - name: Pull Paperless-ngx images
+      ansible.builtin.command:
+        cmd: docker compose -p paperless pull
+        chdir: "{{ PAPERLESS_DIR }}"
+      become: yes
+
+    - name: Start Paperless-ngx
+      ansible.builtin.command:
+        cmd: docker compose -p paperless up -d --remove-orphans
+        chdir: "{{ PAPERLESS_DIR }}"
+      become: yes
+
+    # ------------------------------------------------------------
+    # STATUS
+    # ------------------------------------------------------------
+
+    - name: Show Paperless container status
+      ansible.builtin.command:
+        cmd: docker compose -p paperless ps
+        chdir: "{{ PAPERLESS_DIR }}"
+      become: yes
+      register: paperless_status
+      changed_when: false
+
+    - name: Display Paperless container status
+      ansible.builtin.debug:
+        var: paperless_status.stdout_lines

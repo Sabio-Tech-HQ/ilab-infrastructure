@@ -336,7 +336,46 @@ http:
       tls:
         certResolver: route53_aws
 
+    paperless:
+      rule: "Host(`paperless.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: paperless-service
+      tls:
+        certResolver: route53_aws
+
+    safaridc:
+      rule: "Host(`safaridc.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: safaridc-service
+      tls:
+        certResolver: route53_aws
+    skins:
+      rule: "Host(`skins.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: skins-service
+      tls:
+        certResolver: route53_aws
+
   services:
+
+    skins-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.216:3000/"
+
+    safaridc-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.216:8082/"
+
+    paperless-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.94:8000/"
+
     opencode-service:
       loadBalancer:
         servers:

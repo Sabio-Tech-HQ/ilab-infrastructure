@@ -112,6 +112,12 @@
           - docker-buildx-plugin
           - docker-compose-plugin
           - containerd.io
+          # ==========================================
+          # WEASYPRINT CONVERSION SYSTEM ENGINE & TOOLING DEPENDENCIES
+          # ==========================================
+          - weasyprint
+          - libpango-1.0-0
+          - fonts-liberation
         state: present
         update_cache: yes
 
@@ -183,7 +189,6 @@
     # ==========================================
     # 8. OPENCODE
     # ==========================================
-
     - name: Install OpenCode
       become_user: jthairu
       ansible.builtin.shell:

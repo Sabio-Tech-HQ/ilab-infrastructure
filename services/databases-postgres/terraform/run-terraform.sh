@@ -20,6 +20,7 @@ export TF_VAR_gateway=$(bw get item databases-postgres-terraform | jq -r '.field
 export TF_VAR_db_password=$(bw get item databases-postgres-terraform | jq -r '.fields[] | select(.name=="db_password").value')
 export TF_VAR_vaultwarden_db_password=$(bw get item databases-postgres-terraform | jq -r '.fields[] | select(.name=="vaultwarden_db_password").value')
 export TF_VAR_penpot_db_password=$(bw get item databases-postgres-terraform | jq -r '.fields[] | select(.name=="penpot_db_password").value')
+export TF_VAR_paperless_db_password=$(bw get item databases-postgres-terraform | jq -r '.fields[] | select(.name=="paperless_db_password").value')
 export TF_VAR_db_vip=$(bw get item databases-postgres-terraform | jq -r '.fields[] | select(.name=="db_vip").value')
 
 # Run terraform with any passed arguments

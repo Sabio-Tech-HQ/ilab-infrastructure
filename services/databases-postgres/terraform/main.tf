@@ -29,3 +29,16 @@ resource "postgresql_database" "penpot" {
   name  = "penpot"
   owner = postgresql_role.penpot.name
 }
+
+
+# --- Paperless ---
+resource "postgresql_role" "paperless" {
+  name     = "paperless"
+  login    = true
+  password = var.paperless_db_password
+}
+
+resource "postgresql_database" "paperless" {
+  name  = "paperless"
+  owner = postgresql_role.paperless.name
+}
