@@ -4,10 +4,12 @@
   become: true
 
   vars:
-    jtnas_ip: "10.10.10.95"  
+    jtnas_ip: "10.10.10.95"
     jtnas_username: "{{ lookup('community.general.bitwarden', 'media-ansible', field='jtnas_username') }}"
     jtnas_password: "{{ lookup('community.general.bitwarden', 'media-ansible', field='jtnas_password') }}"
-
+    media_stack_root: "/opt/media-stack"
+    admin_user: "jthairu"
+    admin_group: "jthairu"
 
   roles:
     - nas_mounts  # Shared role for CIFS mounts
@@ -32,17 +34,25 @@
         name: traefik_proxy
         state: present
 
-    - name: Create Media directory
-      file:
+    - name: Ensure local media-stack directory exists
+      ansible.builtin.file:
         path: "{{ media_stack_root }}"
         state: directory
         owner: "{{ admin_user }}"
         group: "{{ admin_group }}"
-        mode: '0755'
+        mode: '0775'
+
+    - name: Verify mount points are accessible
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /volume1/downloads
+        - /volume1/music
+        - /volume1/video
 
     - name: Copy Docker Compose configuration
       template:
-        src: docker-compose.yaml.j2  # Uses templates/ directory by default
+        src: docker-compose.yaml.j2
         dest: "{{ media_stack_root }}/docker-compose.yaml"
         owner: "{{ admin_user }}"
         group: "{{ admin_group }}"

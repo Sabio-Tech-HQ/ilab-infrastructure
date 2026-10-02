@@ -358,8 +358,20 @@ http:
       service: skins-service
       tls:
         certResolver: route53_aws
+    chezagolf:
+      rule: "Host(`chezagolf.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: chezagolf-service
+      tls:
+        certResolver: route53_aws
 
   services:
+
+    chezagolf-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.10.10.216:3001/"
 
     skins-service:
       loadBalancer:

@@ -53,8 +53,6 @@ services:
       - TZ={{ timezone }}
       - PUID={{ admin_uid }}
       - PGID={{ admin_gid }}
-     
-    
     ports:
       - 8686:8686
     volumes:
@@ -74,7 +72,6 @@ services:
       - TZ={{ timezone }}
       - PUID={{ admin_uid }}
       - PGID={{ admin_gid }}
-     
     ports:
       - 7878:7878
     volumes:
@@ -94,7 +91,6 @@ services:
       - TZ={{ timezone }}
       - PUID={{ admin_uid }}
       - PGID={{ admin_gid }}
-     
     ports:
       - 8989:8989
     volumes:
@@ -128,6 +124,7 @@ services:
 
   nzbget:
     image: "linuxserver/nzbget:latest"
+    logging: *loki-logging
     container_name: nzbget
     environment:
       - PUID={{ admin_uid }}  

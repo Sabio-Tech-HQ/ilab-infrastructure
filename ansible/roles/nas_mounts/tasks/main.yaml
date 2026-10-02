@@ -9,8 +9,8 @@
   copy:
     dest: /root/.nas-credentials
     content: |
-      username={{ jtnas_username }}
-      password={{ jtnas_password }}
+      username={{ jtnas_username | first if jtnas_username is iterable and jtnas_username is not string else jtnas_username }}
+      password={{ jtnas_password | first if jtnas_password is iterable and jtnas_password is not string else jtnas_password }}
     owner: root
     group: root
     mode: '0600'
