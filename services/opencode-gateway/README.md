@@ -26,7 +26,7 @@ on the devops VM. The EC2 holds no state.
 ## Credentials
 
 - Basic auth (username `jthairu`): Vaultwarden item `opencode.mwakilishi.com`,
-  and AWS SSM `/mwakilishi/prod/opencode_web_{username,password}` (SecureString).
+  and AWS SSM `/opencode/web_{username,password}` (SecureString, us-east-1).
 - The htpasswd file lives at `/etc/nginx/.htpasswd_opencode` on the EC2 —
   NOT in this repo.
 
