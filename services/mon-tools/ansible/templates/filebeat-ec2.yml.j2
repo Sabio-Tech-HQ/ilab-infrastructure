@@ -1,0 +1,17 @@
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: true
+
+filebeat.inputs:
+  - type: filestream
+    id: nginx-ec2
+    paths:
+      - /var/log/nginx/access.log
+      - /var/log/nginx/error.log
+    fields:
+      vm_name: nginx_ec2
+    fields_under_root: true
+
+output.logstash:
+  hosts: ["10.10.10.90:5044"]

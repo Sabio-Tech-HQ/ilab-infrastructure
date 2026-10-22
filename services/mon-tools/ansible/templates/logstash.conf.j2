@@ -10,7 +10,10 @@ input {
 
 filter {
   # 1. Determine the dataset name based on your custom fields
-  if [service] == "plex-media-server" {
+  # Docker-sourced logs: dataset from the container name (EC2 prod apps + lab containers)
+  if [container][name] {
+    mutate { add_field => { "[data_stream][dataset]" => "%{[container][name]}" } }
+  } else if [service] == "plex-media-server" {
     mutate { add_field => { "[data_stream][dataset]" => "plex" } }
   } else if [vm_name] {
     mutate { add_field => { "[data_stream][dataset]" => "%{vm_name}" } }
