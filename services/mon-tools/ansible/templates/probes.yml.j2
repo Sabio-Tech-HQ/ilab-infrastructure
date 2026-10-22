@@ -1,0 +1,81 @@
+name: service-probes
+metricbeat.modules:
+- module: http
+  period: 60s
+  metricsets: ["json"]
+  namespace: pvestatus
+  name: proxmox-ilab-node-01
+  hosts: ["https://10.10.10.101:8006/api2/json/nodes/ilab-node-01/status"]
+  headers:
+    Authorization: "PVEAPIToken=<TOKEN>"
+  ssl.verification_mode: "none"
+
+- module: http
+  period: 60s
+  metricsets: ["json"]
+  namespace: pvestatus
+  name: proxmox-ilab-node-02
+  hosts: ["https://10.10.10.102:8006/api2/json/nodes/ilab-node-02/status"]
+  headers:
+    Authorization: "PVEAPIToken=<TOKEN>"
+  ssl.verification_mode: "none"
+
+- module: http
+  period: 60s
+  metricsets: ["json"]
+  namespace: pvestatus
+  name: proxmox-ilab-node-03
+  hosts: ["https://10.10.10.103:8006/api2/json/nodes/ilab-node-03/status"]
+  headers:
+    Authorization: "PVEAPIToken=<TOKEN>"
+  ssl.verification_mode: "none"
+
+- module: http
+  period: 60s
+  metricsets: ["server"]
+  name: svc-traefik
+  hosts: ["http://10.10.10.15:8080/api/overview"]
+
+- module: http
+  period: 60s
+  metricsets: ["server"]
+  name: svc-radarr
+  hosts: ["http://10.10.10.30:7878/api/v3/system/status?apikey=<KEY>"]
+
+- module: http
+  period: 60s
+  metricsets: ["server"]
+  name: svc-sonarr
+  hosts: ["http://10.10.10.30:8989/api/v3/system/status?apikey=<KEY>"]
+
+- module: http
+  period: 60s
+  metricsets: ["server"]
+  name: svc-plex
+  hosts: ["http://10.10.10.60:32400/identity"]
+
+- module: http
+  period: 60s
+  metricsets: ["server"]
+  name: svc-nzbget
+  hosts: ["http://10.10.10.30:6789/"]
+
+- module: http
+  period: 60s
+  metricsets: ["server"]
+  name: svc-homeassistant
+  hosts: ["http://10.10.10.80:8123/api/"]
+
+- module: http
+  period: 60s
+  metricsets: ["server"]
+  name: svc-vaultwarden
+  hosts: ["http://10.10.10.200/alive"]
+
+- module: http
+  period: 60s
+  metricsets: ["server"]
+  name: svc-grafana
+  hosts: ["http://10.10.10.90:3000/api/health"]
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
