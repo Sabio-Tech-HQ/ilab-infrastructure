@@ -32,3 +32,17 @@ inventory as host `ec2-prod` with per-container metrics (container.name field).
 kibana.mwakilishi.com is PUBLIC via the EC2 gateway pattern, behind basic auth
 (shared htpasswd with ai.mwakilishi.com — Vaultwarden item `ai.mwakilishi.com`).
 LAN stays on the internal Traefik via Pi-hole override.
+
+
+## Kibana alerting + email notifier
+
+Basic license has NO email connector, so: Kibana rules do detection
+(Alerts tab) and `~/bin/stack-alerts` (cron /etc/cron.d/stack-alerts, every
+5 min, on devops) polls /api/alerting/rules/_find and emails
+mwakilishi@gmail.com on firing (hourly re-notify) + one recovery notice.
+
+Rules (created via API, visible in Kibana → Alerts):
+- Container CPU >90% (10m avg, group by container.name, metricbeat-*)
+- Filesystem >85% used (15m max, group by host.name, metricbeat-*)
+- Log dataset quiet >20m (ES|QL absence check: nginx_ec2, mwakilishi_php,
+  sabiogolf_api, diaspora_love_app)

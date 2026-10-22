@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""stack-alerts — email notifier for Kibana alerting rules (basic license has no
+email connector, so this watches rule states over the API and emails instead).
+
+Kibana at mon-tools does detection (threshold/ES|QL rules); this runs on the
+devops box every 5 min via /etc/cron.d/stack-alerts, emails mwakilishi@gmail.com
+when rules fire (60-min re-notify cooldown while active) and once on recovery.
+Ops: stack-alerts [--dry-run]     State: ~/.config/stack-alerts/state.json
+"""
+import json
+import os
+import smtplib
+import ssl
+import subprocess
+import sys
+import time
+from datetime import datetime
+from email.message import EmailMessage
+
+KIBANA = "http://10.10.10.90:5601"
+STATE_DIR = os.path.expanduser("~/.config/stack-alerts")
+VAULT = os.path.expanduser("~/ilab-infrastructure/ansible/vaults/legacy-vault.yml")
+VAULT_PW = os.path.expanduser("~/.ansible_vault_pass")
+MAIL_FROM = MAIL_TO = "mwakilishi@gmail.com"
+COOLDOWN = 3600  # re-notify hourly while a rule stays firing
+
+
+def log(msg):
+    print("[%s] %s" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), msg), flush=True)
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(os.path.join(STATE_DIR, "watch.log"), "a") as f:
+        f.write(msg + "\n")
+
+
+def firing_rules():
+    """Rule id -> name for every rule currently firing."""
+    out = {}
+    url = KIBANA + "/api/alerting/rules/_find?per_page=50"
+    r = subprocess.run(["curl", "-s", "-m", "15", url],
+                       capture_output=True, text=True)
+    try:
+        data = json.loads(r.stdout)
+    except Exception:
+        log("API parse failed: " + r.stdout[:120])
+        return out
+    for rule in data.get("data", []):
+        st = (rule.get("execution_status") or {}).get("status", "")
+        active = rule.get("active_alert_instances") or rule.get("alert_instances_active") or 0
+        if st == "active" or active:
+            out[rule["id"]] = rule.get("name", rule["id"])
+    return out
+
+
+def smtp_password():
+    r = subprocess.run(["ansible-vault", "view", VAULT,
+                        "--vault-password-file", VAULT_PW],
+                       capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        if line.strip().startswith("smtp_pass:"):
+            return line.split(":", 1)[1].strip().strip('"')
+    return None
+
+
+def mail(subject, body):
+    pw = smtp_password()
+    if not pw:
+        log("no smtp_pass — mail skipped")
+        return
+    m = EmailMessage()
+    m["From"], m["To"] = MAIL_FROM, MAIL_TO
+    m["Subject"] = subject
+    m.set_content(body)
+    with smtplib.SMTP("smtp.gmail.com", 587) as s:
+        s.starttls(context=ssl.create_default_context())
+        s.login(MAIL_FROM, pw)
+        s.send_message(m)
+
+
+def main():
+    dry = "--dry-run" in sys.argv
+    os.makedirs(STATE_DIR, exist_ok=True)
+    sf = os.path.join(STATE_DIR, "state.json")
+    state = json.load(open(sf)) if os.path.exists(sf) else {}
+    now = time.time()
+    firing = firing_rules()
+    if dry:
+        log("dry-run firing: " + (json.dumps(firing) or "none"))
+        return
+    send, body = [], []
+    for rid, name in firing.items():
+        last = state.get(rid, {}).get("notified", 0)
+        if now - last > COOLDOWN:
+            send.append(name)
+            body.append("FIRING: %s" % name)
+            state.setdefault(rid, {})["notified"] = now
+            state[rid]["active"] = True
+    for rid, info in list(state.items()):
+        if info.get("active") and rid not in firing:
+            send.append("recovered")
+            body.append("RECOVERED: %s" % info.get("name", rid))
+            info["active"] = False
+            info["notified"] = 0
+    for rid, name in firing.items():
+        state.setdefault(rid, {})["name"] = name
+    json.dump(state, open(sf, "w"))
+    if send:
+        try:
+            mail("[ALERT] stack monitoring: %s" % ", ".join(sorted(set(send))),
+                 "\n".join(body) + "\n\nKibana: https://kibana.mwakilishi.com → Alerts\n")
+            log("emailed: " + ", ".join(sorted(set(send))))
+        except Exception as e:
+            log("mail failed: %s" % e)
+    else:
+        log("clean")
+
+
+if __name__ == "__main__":
+    main()
