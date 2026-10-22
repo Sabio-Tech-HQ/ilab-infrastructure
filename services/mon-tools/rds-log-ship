@@ -16,7 +16,8 @@ import urllib.request
 from datetime import datetime
 
 GROUPS = {
-    "/aws/rds/cluster/mwakilishidb/error": "rds_mwakilishi_mysql",
+    "/aws/rds/instance/sabio-shared-pg18/postgresql": "rds_shared_pg18",
+    "/aws/rds/cluster/mwakilishidb/error": "rds_mwakilishi_mysql_legacy",
 }
 LOGSTASH = "http://10.10.10.90:8080"
 STATE = os.path.expanduser("~/.config/rds-log-ship/state.json")
