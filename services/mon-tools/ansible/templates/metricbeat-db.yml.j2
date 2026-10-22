@@ -1,0 +1,14 @@
+name: db-metrics
+metricbeat.modules:
+- module: postgresql
+  period: 30s
+  hosts: ["postgres://<USER>:<PASS>@  # creds: Vaultwarden RDS items (sabiogolf-prod / mwakilishi), NEVER commit real valuessabio-shared-pg18.cor4ow0y8egt.us-east-1.rds.amazonaws.com:5432?sslmode=require"]
+  metricsets: ["bgwriter", "activity"]
+
+- module: postgresql
+  period: 60s
+  hosts: ["postgres://<USER>:<PASS>@  # creds: Vaultwarden RDS items (sabiogolf-prod / mwakilishi), NEVER commit real valuessabio-shared-pg18.cor4ow0y8egt.us-east-1.rds.amazonaws.com:5432/mwakilishi?sslmode=require"]
+  metricsets: ["activity"]
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
