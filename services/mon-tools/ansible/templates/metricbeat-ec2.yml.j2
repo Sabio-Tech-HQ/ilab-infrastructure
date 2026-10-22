@@ -1,0 +1,16 @@
+name: ec2-prod
+metricbeat.modules:
+- module: system
+  metricsets: ["cpu", "load", "memory", "network", "diskio", "filesystem", "process", "process_summary"]
+  period: 30s
+  process.include_top_n:
+    by_cpu: 5
+    by_memory: 5
+
+- module: docker
+  metricsets: ["container", "cpu", "diskio", "healthcheck", "info", "memory", "network"]
+  period: 30s
+  hosts: ["unix:///var/run/docker.sock"]
+
+output.elasticsearch:
+  hosts: ["http://10.10.10.90:9200"]

@@ -21,3 +21,14 @@ docker run -d --name filebeat --restart unless-stopped --user 0:0 \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   -v /var/log/nginx:/var/log/nginx:ro \
   docker.elastic.co/beats/filebeat:9.2.2
+
+## EC2 metrics (metricbeat) + public Kibana
+
+metricbeat on the EC2 (same --user 0:0 + root-owned config rules as filebeat,
+plus --pid host and /hostfs mounts): system module (host) + docker module
+(32 containers) -> ES directly over the tunnel. Shows up in Kibana Metrics
+inventory as host `ec2-prod` with per-container metrics (container.name field).
+
+kibana.mwakilishi.com is PUBLIC via the EC2 gateway pattern, behind basic auth
+(shared htpasswd with ai.mwakilishi.com — Vaultwarden item `ai.mwakilishi.com`).
+LAN stays on the internal Traefik via Pi-hole override.
