@@ -46,3 +46,21 @@ Rules (created via API, visible in Kibana → Alerts):
 - Filesystem >85% used (15m max, group by host.name, metricbeat-*)
 - Log dataset quiet >20m (ES|QL absence check: nginx_ec2, mwakilishi_php,
   sabiogolf_api, diaspora_love_app)
+
+
+## RDS database monitoring
+
+- **Vaultwarden items:** `RDS sabiogolf-prod (PostgreSQL)` (host
+  sabio-shared-pg18, PG18) and `RDS mwakilishi-db (MySQL)` (MySQL 8.4).
+- **Metrics:** `metricbeat-db` container on mon-tools — postgresql module
+  (sabio-shared-pg18: database/bgwriter/activity) + mysql module (status) via
+  the WireGuard tunnel (RDS SGs already allow the LAN). Config at
+  /opt/mon-tools/metricbeat-db/ (root-owned 600, contains creds).
+- **Logs:** `~/bin/rds-log-ship` (cron /etc/cron.d/rds-log-ship, devops) pulls
+  CloudWatch log groups → Logstash HTTP :8080 → logs-rds_mwakilishi_mysql.
+  sabiogolf PG exports nothing to CloudWatch yet — needs
+  `aws rds modify-db-instance --sabio-shared-pg18
+  --cloudwatch-logs-export-configurations PostgresqlLog=...` (dev's call).
+- **Alert:** rule "RDS fatal DB errors" (FATAL/PANIC in 10m on logs-rds_*).
+- NOTE: `sabioogolf-prod` RDS instance (PG16, 20GB) appears UNUSED (sabiogolf
+  points at sabio-shared-pg18) — cost-cleanup candidate for the dev.
