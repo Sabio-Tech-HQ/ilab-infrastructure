@@ -194,14 +194,6 @@ http:
       tls:
         certResolver: route53_aws
 
-    pacs:
-      rule: "Host(`pacs.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: pacs-service
-      tls:
-        certResolver: route53_aws
-
     memos:
       rule: "Host(`memos.mwakilishi.com`)"
       entryPoints:
@@ -330,11 +322,6 @@ http:
       loadBalancer:
         servers:
           - url: "http://10.10.10.90:5601"
-
-    pacs-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.99:8090"
 
     pihole01-service:
       loadBalancer:
