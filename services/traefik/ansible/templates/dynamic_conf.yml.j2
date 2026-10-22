@@ -146,14 +146,6 @@ http:
       tls:
         certResolver: route53_aws
 
-    influxdb:
-      rule: "Host(`influxdb.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: influxdb-service
-      tls:
-        certResolver: route53_aws
-
     loki:
       rule: "Host(`loki.mwakilishi.com`)"
       entryPoints:
@@ -194,14 +186,6 @@ http:
       tls:
         certResolver: route53_aws
 
-    superset:
-      rule: "Host(`superset.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: superset-service
-      tls:
-        certResolver: route53_aws
-
     kibana:
       rule: "Host(`kibana.mwakilishi.com`)"
       entryPoints:
@@ -218,47 +202,11 @@ http:
       tls:
         certResolver: route53_aws
 
-    kafka:
-      rule: "Host(`kafka.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: kafka-service
-      tls:
-        certResolver: route53_aws
-
-    devops:
-      rule: "Host(`devops.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: devops-service
-      middlewares:
-        - forwarded-headers
-      tls:
-        certResolver: route53_aws
-
-    member.devops:
-      rule: "Host(`member.devops.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: devops-service
-      middlewares:
-        - forwarded-headers
-      tls:
-        certResolver: route53_aws
-
     memos:
       rule: "Host(`memos.mwakilishi.com`)"
       entryPoints:
         - websecure
       service: memos-service
-      tls:
-        certResolver: route53_aws
-
-    haproxy:
-      rule: "Host(`haproxy.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: haproxy-service
       tls:
         certResolver: route53_aws
 
@@ -373,25 +321,10 @@ http:
         servers:
           - url: "http://10.10.10.50:8989/"
 
-    haproxy-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.200:8080/"
-
     memos-service:
       loadBalancer:
         servers:
           - url: "http://10.10.10.35:5230/"
-
-    devops-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.216:80"
-
-    kafka-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.216:8088"
 
     kibana-service:
       loadBalancer:
@@ -402,11 +335,6 @@ http:
       loadBalancer:
         servers:
           - url: "http://10.10.10.99:8090"
-
-    superset-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.246:8088"
 
     pihole01-service:
       loadBalancer:
@@ -486,11 +414,6 @@ http:
       loadBalancer:
         servers:
           - url: "http://10.10.10.90:3000"
-
-    influxdb-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.90:8086"
 
     loki-service:
       loadBalancer:
