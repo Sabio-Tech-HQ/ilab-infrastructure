@@ -304,13 +304,27 @@ http:
       tls:
         certResolver: route53_aws
 
+    # The AI entry point is OpenCode (devops VM :4096). The Open WebUI
+    # fallback moved to webui.mwakilishi.com; opencode.* now redirects here.
     ai:
       rule: "Host(`ai.mwakilishi.com`)"
+      entryPoints:
+        - websecure
+      service: opencode-service
+      tls:
+        certResolver: route53_aws
+
+    webui:
+      rule: "Host(`webui.mwakilishi.com`)"
       entryPoints:
         - websecure
       service: ai-service
       tls:
         certResolver: route53_aws
+
+    # opencode.mwakilishi.com now lives on AWS (Route53 -> 34.200.25.124).
+    # Router + permanent redirect removed 2026-10-16; keeping the host on the
+    # home traefik only re-poisoned browsers with cached 301s to ai.mwakilishi.com.
 
     ittools:
       rule: "Host(`ittools.mwakilishi.com`)"
@@ -325,14 +339,6 @@ http:
       entryPoints:
         - websecure
       service: penpot-service
-      tls:
-        certResolver: route53_aws
-
-    opencode:
-      rule: "Host(`opencode.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: opencode-service
       tls:
         certResolver: route53_aws
 
@@ -411,7 +417,7 @@ http:
     ai-service:
       loadBalancer:
         servers:
-          - url: "http://10.10.10.99:3000/"
+          - url: "http://10.10.10.216:3000/"
 
     maxscale-service:
       loadBalancer:
@@ -515,13 +521,13 @@ http:
       loadBalancer:
         servers:
           - url: "http://10.10.10.30:7878"
-        passHostHeader: false
+        passHostHeader: true
 
     sonarr-service:
       loadBalancer:
         servers:
           - url: "http://10.10.10.30:8989"
-        passHostHeader: false
+        passHostHeader: true
 
     lidarr-service:
       loadBalancer:
