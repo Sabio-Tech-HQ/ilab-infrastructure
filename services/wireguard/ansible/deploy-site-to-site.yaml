@@ -1,0 +1,54 @@
+---
+# Site-to-site tunnel: home lab <-> AWS (account 881490122193, us-east-1)
+#
+# Home side (this playbook): wg1 on the WireGuard VM. Keys: /etc/wireguard/s2s_home.key (s2s_aws.key on the peer).
+# AWS side (manual, ubuntu@34.200.25.124 via ~/.ssh/nidate.pem): /etc/wireguard/wg0.conf = 10.20.20.2/24, UDP 51820,
+#   peer AllowedIPs = 10.20.20.0/24, 10.10.10.0/24, 10.20.10.0/24 (no Endpoint - home initiates).
+# AWS prerequisites (already applied): UDP 51820 ingress on sg-033773d714fd6a314; source-dest-check disabled on
+#   i-0b412ebfc6f7a92ec; VPC route tables rtb-001e8a54286de9370 + rtb-0eab539b4903e9ab6 route
+#   10.10.10.0/24, 10.20.10.0/24, 10.20.20.0/24 -> i-0b412ebfc6f7a92ec; RDS SGs sg-0820d05899efb6686 (5432) and
+#   sg-04f0ef77b326ce704 (3306) allow 10.10.10.0/24, 10.20.10.0/24, 10.20.20.0/24.
+# LAN prerequisite: router 10.10.10.1 static route 172.31.0.0/16 -> 10.10.10.20.
+
+- name: Deploy WireGuard site-to-site tunnel to AWS
+  hosts: vpn
+  become: true
+  vars:
+    s2s_interface: wg1
+    s2s_tunnel_ip: 10.20.20.1/24
+    s2s_listen_port: 51821
+    aws_peer_name: aws-mwakilishi (34.200.25.124)
+    aws_peer_endpoint: 34.200.25.124:51820
+    aws_peer_pubkey: lHiQx+yZLQsrT3dYaaU0EcwZWI4/2/gZwlzXFYD8aHc=
+
+  tasks:
+    - name: Read site-to-site private key
+      ansible.builtin.slurp:
+        src: /etc/wireguard/s2s_home.key
+      register: s2s_privkey
+
+    - name: Persist IP forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_set: true
+        reload: true
+
+    - name: Render wg1.conf
+      ansible.builtin.template:
+        src: templates/wg1.conf.j2
+        dest: /etc/wireguard/wg1.conf
+        mode: '0600'
+      notify: Restart site-to-site WireGuard
+
+    - name: Enable and start site-to-site WireGuard
+      ansible.builtin.systemd:
+        name: "wg-quick@{{ s2s_interface }}"
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart site-to-site WireGuard
+      ansible.builtin.systemd:
+        name: "wg-quick@{{ s2s_interface }}"
+        state: restarted

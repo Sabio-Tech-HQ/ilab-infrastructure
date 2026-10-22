@@ -1,0 +1,13 @@
+[Interface]
+Address = {{ s2s_tunnel_ip }}
+ListenPort = {{ s2s_listen_port }}
+PrivateKey = {{ s2s_privkey.content | b64decode | trim }}
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT
+
+[Peer]
+# {{ aws_peer_name }}
+PublicKey = {{ aws_peer_pubkey }}
+Endpoint = {{ aws_peer_endpoint }}
+AllowedIPs = 10.20.20.2/32, 172.31.0.0/16
+PersistentKeepalive = 25

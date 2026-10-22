@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""tunnel-watch — watchdog for the home<->AWS WireGuard site-to-site tunnel.
+
+Every gateway (ai/plex/vault/hass.mwakilishi.com) rides on this tunnel. If
+the data path to the AWS peer (10.20.20.2) dies, restart wg1 on
+wireguard-01 (home side initiates, so restarting home's side re-handshakes),
+then re-check and email mwakilishi@gmail.com with the outcome.
+
+Cron: /etc/cron.d/tunnel-watch (every 2 min, flock-guarded)
+Ops:  tunnel-watch            # check (and fix + email if down)
+      tunnel-watch --dry-run  # report only, never restart
+State/log: ~/.config/tunnel-watch/
+"""
+import json
+import os
+import smtplib
+import ssl
+import subprocess
+import sys
+import time
+from datetime import datetime
+from email.message import EmailMessage
+
+WG_HOST = "10.10.10.20"
+PEER_IP = "10.20.20.2"          # EC2 wg0
+RESTART_CMD = "sudo -n systemctl restart wg-quick@wg1"
+VAULT = os.path.expanduser("~/ilab-infrastructure/ansible/vaults/legacy-vault.yml")
+VAULT_PW = os.path.expanduser("~/.ansible_vault_pass")
+STATE_DIR = os.path.expanduser("~/.config/tunnel-watch")
+LOG = os.path.join(STATE_DIR, "watch.log")
+MAIL_TO = "mwakilishi@gmail.com"
+MAIL_FROM = "mwakilishi@gmail.com"
+
+
+def log(msg):
+    line = "[%s] %s" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), msg)
+    print(line, flush=True)
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(LOG, "a") as f:
+        f.write(line + "\n")
+
+
+def tunnel_up():
+    """Data path alive = at least one of three pings to the AWS peer lands.
+    Must run ON the WG VM: the tunnel subnet is only routed from there."""
+    for _ in range(3):
+        r = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
+             "jthairu@" + WG_HOST, "ping -c 1 -W 3 " + PEER_IP],
+            capture_output=True, timeout=30)
+        if r.returncode == 0:
+            return True
+        time.sleep(2)
+    return False
+
+
+def restart_tunnel():
+    r = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
+                        "jthairu@" + WG_HOST, RESTART_CMD],
+                       capture_output=True, text=True, timeout=60)
+    return r.returncode == 0, (r.stdout + r.stderr).strip()[:200]
+
+
+def smtp_password():
+    r = subprocess.run(["ansible-vault", "view", VAULT,
+                        "--vault-password-file", VAULT_PW],
+                       capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        if line.strip().startswith("smtp_pass:"):
+            return line.split(":", 1)[1].strip().strip('"')
+    return None
+
+
+def mail(subject, body):
+    pw = smtp_password()
+    if not pw:
+        log("ALERT MAIL SKIPPED — no smtp_pass in vault")
+        return
+    m = EmailMessage()
+    m["From"] = MAIL_FROM
+    m["To"] = MAIL_TO
+    m["Subject"] = subject
+    m.set_content(body)
+    with smtplib.SMTP("smtp.gmail.com", 587) as s:
+        s.starttls(context=ssl.create_default_context())
+        s.login(MAIL_FROM, pw)
+        s.send_message(m)
+
+
+def main():
+    dry = "--dry-run" in sys.argv
+    os.makedirs(STATE_DIR, exist_ok=True)
+    state_file = os.path.join(STATE_DIR, "state.json")
+    state = json.load(open(state_file)) if os.path.exists(state_file) else {}
+
+    if tunnel_up():
+        # recovery notice if the previous run failed
+        if state.get("last_status") == "down":
+            log("tunnel RECOVERED on its own")
+            try:
+                mail("[TUNNEL] recovered", "The home<->AWS WireGuard tunnel is up again on its own.")
+            except Exception as e:
+                log("recovery mail failed: %s" % e)
+        state["last_status"] = "up"
+        json.dump(state, open(state_file, "w"))
+        log("tunnel up") if dry else None
+        return
+
+    log("tunnel DOWN — %s" % ("dry-run: would restart" if dry else "restarting wg1"))
+    if dry:
+        return
+    ok, out = restart_tunnel()
+    log("restart issued (%s) %s" % ("ok" if ok else "FAILED", out))
+    time.sleep(12)
+    if tunnel_up():
+        log("tunnel RECOVERED after restart")
+        state["last_status"] = "up-restarted"
+        state["restarts"] = state.get("restarts", 0) + 1
+        json.dump(state, open(state_file, "w"))
+        try:
+            mail("[TUNNEL] was down — restarted wg1, recovered",
+                 "The home<->AWS WireGuard tunnel stopped answering and was restarted on "
+                 "wireguard-01. Data path confirmed recovered.\n\nAll public gateways "
+                 "(ai/plex/vault/hass.mwakilishi.com) were briefly unreachable.\n"
+                 "Total watchdog restarts: %d" % state["restarts"])
+        except Exception as e:
+            log("mail failed: %s" % e)
+    else:
+        log("tunnel STILL DOWN after restart")
+        state["last_status"] = "down"
+        json.dump(state, open(state_file, "w"))
+        try:
+            mail("[TUNNEL] DOWN — restart did not help",
+                 "The home<->AWS WireGuard tunnel is down and a wg1 restart on "
+                 "wireguard-01 did NOT recover it. Check both ends: "
+                 "'wg show wg1' on wireguard-01 and 'wg show wg0' on the EC2 "
+                 "(34.200.25.124). All public gateways are unreachable.")
+        except Exception as e:
+            log("mail failed: %s" % e)
+
+
+if __name__ == "__main__":
+    main()
