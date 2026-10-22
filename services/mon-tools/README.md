@@ -50,11 +50,15 @@ Rules (created via API, visible in Kibana → Alerts):
 
 ## RDS database monitoring
 
-- **Vaultwarden items:** `RDS sabiogolf-prod (PostgreSQL)` (host
-  sabio-shared-pg18, PG18) and `RDS mwakilishi-db (MySQL)` (MySQL 8.4).
-- **Metrics:** `metricbeat-db` container on mon-tools — postgresql module
-  (sabio-shared-pg18: database/bgwriter/activity) + mysql module (status) via
-  the WireGuard tunnel (RDS SGs already allow the LAN). Config at
+- **Vaultwarden items:** `RDS sabiogolf-prod (PostgreSQL)`, `RDS mwakilishi
+  (PostgreSQL)`, `RDS diaspora.love (PostgreSQL)` — ALL on the shared PG18
+  instance (sabio-shared-pg18 hosts databases sabiogolf, mwakilishi,
+  diasporalove + sabiogolf_staging). Creds sourced from SSM
+  (/mwakilishi/prod/*, /diaspora-love/prod/DB_*).
+- **Metrics:** `metricbeat-db` on mon-tools — TWO postgresql modules on
+  sabio-shared-pg18 (sabiogolf user + mwakilishi user): database/bgwriter/
+  activity per-DB stats via the tunnel. The mysql module was REMOVED — the
+  mwakilishi-db MySQL RDS is legacy from the pre-PG era. Config at
   /opt/mon-tools/metricbeat-db/ (root-owned 600, contains creds).
 - **Logs:** `~/bin/rds-log-ship` (cron /etc/cron.d/rds-log-ship, devops) pulls
   CloudWatch log groups → Logstash HTTP :8080 → logs-rds_mwakilishi_mysql.
