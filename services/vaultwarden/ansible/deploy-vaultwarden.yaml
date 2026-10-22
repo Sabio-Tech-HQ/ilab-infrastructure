@@ -74,7 +74,7 @@
               restart: always
               environment:
                 - DATABASE_URL={{ vaultwarden_db_url }}
-                - SIGNUPS_ALLOWED=true
+                - SIGNUPS_ALLOWED=false
                 - WEBSOCKET_ENABLED=true
                 - DOMAIN={{ vault_domain }}
               ports:
