@@ -194,22 +194,6 @@ http:
       tls:
         certResolver: route53_aws
 
-    pmm:
-      rule: "Host(`pmm.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: pmm-service
-      tls:
-        certResolver: route53_aws
-
-    airflow:
-      rule: "Host(`airflow.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: airflow-service
-      tls:
-        certResolver: route53_aws
-
     superset:
       rule: "Host(`superset.mwakilishi.com`)"
       entryPoints:
@@ -223,14 +207,6 @@ http:
       entryPoints:
         - websecure
       service: kibana-service
-      tls:
-        certResolver: route53_aws
-
-    drupal:
-      rule: "Host(`drupal.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: drupal-service
       tls:
         certResolver: route53_aws
 
@@ -265,16 +241,6 @@ http:
       entryPoints:
         - websecure
       service: devops-service
-      middlewares:
-        - forwarded-headers
-      tls:
-        certResolver: route53_aws
-
-    nidate:
-      rule: "Host(`nidate.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: nidate-service
       middlewares:
         - forwarded-headers
       tls:
@@ -350,13 +316,6 @@ http:
       tls:
         certResolver: route53_aws
 
-    safaridc:
-      rule: "Host(`safaridc.mwakilishi.com`)"
-      entryPoints:
-        - websecure
-      service: safaridc-service
-      tls:
-        certResolver: route53_aws
     skins:
       rule: "Host(`skins.mwakilishi.com`)"
       entryPoints:
@@ -384,11 +343,6 @@ http:
         servers:
           - url: "http://10.10.10.216:3000/"
 
-    safaridc-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.216:8082/"
-
     paperless-service:
       loadBalancer:
         servers:
@@ -399,11 +353,6 @@ http:
         servers:
           - url: "http://10.10.10.216:4096/"
     
-    nidate-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.216:8080/"
-
     penpot-service:
       loadBalancer:
         servers:
@@ -454,20 +403,10 @@ http:
         servers:
           - url: "http://10.10.10.99:8090"
 
-    drupal-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.99:8085"
-
     superset-service:
       loadBalancer:
         servers:
           - url: "http://10.10.10.246:8088"
-
-    airflow-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.216:80"
 
     pihole01-service:
       loadBalancer:
@@ -504,12 +443,6 @@ http:
           - url: "https://10.10.10.1:443"
         passHostHeader: true
         serversTransport: unifi-transport
-
-    pmm-service:
-      loadBalancer:
-        servers:
-          - url: "http://10.10.10.44:80"
-        passHostHeader: true
 
     plex-service:
       loadBalancer:
