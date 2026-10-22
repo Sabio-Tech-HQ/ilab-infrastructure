@@ -1,0 +1,2 @@
+# WireGuard site-to-site watchdog — every 2 min (flock-guarded)
+*/2 * * * * jthairu /usr/bin/flock -n /tmp/tunnel-watch.lock /home/jthairu/bin/tunnel-watch >/dev/null 2>&1
