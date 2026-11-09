@@ -28,6 +28,19 @@ services:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_SCHEDULE=0 0 19 * * *
 
+  flaresolverr:
+    image: flaresolverr/flaresolverr:v3.3.25
+    container_name: flaresolverr
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+    networks:
+      - docker_media_network
+    networks:
+      - media
+
   jackett:
     image: linuxserver/jackett:latest
     logging: *loki-logging
